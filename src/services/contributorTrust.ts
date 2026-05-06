@@ -1,8 +1,8 @@
 import type { Octokit } from "octokit";
 import type { RepoConfig } from "../lib/types.js";
 import { CHECK_NAMES, MARKERS, LABEL_DEFS } from "../lib/types.js";
-import { scanContributor } from "../lib/brinApi.js";
 import { evaluateContributor } from "../lib/policy.js";
+import { scanContributorLocally } from "./contributorScanner.js";
 import { createInProgressCheck, completeCheck } from "./checkRuns.js";
 import {
   upsertComment,
@@ -55,7 +55,7 @@ export async function runContributorTrust(
   );
 
   const githubToken = await getGitHubToken(octokit);
-  const result = await scanContributor(authorLogin, { githubToken });
+  const result = await scanContributorLocally(authorLogin, { githubToken });
   const { isSafe } = evaluateContributor(result, config);
 
   log.info(

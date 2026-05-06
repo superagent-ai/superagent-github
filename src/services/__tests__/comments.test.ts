@@ -55,7 +55,6 @@ describe("renderContributorTrustComment", () => {
         identity: 20,
         behavior: 30,
         content: 40,
-        graph: 10,
       },
     };
     const body = renderContributorTrustComment(result);
@@ -72,7 +71,7 @@ describe("renderContributorTrustComment", () => {
     expect(body).toContain("| Identity | 20 |");
     expect(body).toContain("| Behavior | 30 |");
     expect(body).toContain("| Content | 40 |");
-    expect(body).toContain("| Graph | 10 |");
+    expect(body).not.toContain("| Graph |");
     expect(body).toContain("[Full profile](https://brin.sh/contributor/sketchy-user?details=true)");
   });
 
@@ -97,7 +96,7 @@ describe("renderContributorTrustComment", () => {
     const body = renderContributorTrustComment(result);
 
     expect(body).toContain("| Identity | \u2014 |");
-    expect(body).toContain("| Graph | \u2014 |");
+    expect(body).not.toContain("| Graph |");
   });
 
   it("omits full profile link when url is missing", () => {

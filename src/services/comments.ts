@@ -116,7 +116,7 @@ export function renderContributorTrustComment(
   body += `| Identity | ${fmt(sub.identity)} | Account age, contribution history, GPG keys, org memberships |\n`;
   body += `| Behavior | ${fmt(sub.behavior)} | PR patterns, unsolicited contribution ratio, activity cadence |\n`;
   body += `| Content | ${fmt(sub.content)} | PR body substance, issue linkage, contribution quality |\n`;
-  body += `| Graph | ${fmt(sub.graph)} | Cross-repo trust, co-contributor relationships |\n\n`;
+  body += `\n`;
   body += `</details>\n\n`;
 
   body += `<sub>Analyzed by [Brin](https://brin.sh)`;

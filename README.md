@@ -1,6 +1,6 @@
 # Brin GitHub App
 
-A GitHub App that automatically scans pull requests for security threats and evaluates contributor trust profiles using the [Brin](https://brin.sh) API.
+A GitHub App that automatically scans pull requests for security threats using the [Brin](https://brin.sh) API and evaluates contributor trust profiles directly inside the app.
 
 ## What it does
 
@@ -8,7 +8,7 @@ When installed on a repository, the app reacts to pull request events and runs t
 
 **PR Security Scan** -- Analyzes the PR diff for security threats (credential leaks, obfuscated payloads, dependency attacks, etc.) and reports a score from 0-100 with a verdict.
 
-**Contributor Trust Check** -- Evaluates the PR author's GitHub profile across identity, behavior, content, and social graph dimensions to flag accounts that warrant additional review.
+**Contributor Trust Check** -- Evaluates the PR author's GitHub profile across identity, behavior, and content dimensions to flag accounts that warrant additional review.
 
 Results are surfaced as:
 
@@ -61,6 +61,8 @@ PRIVATE_KEY=<contents of your .pem file, with literal \n for newlines>
 WEBHOOK_SECRET=<the secret you set when creating the app>
 ```
 
+`BRIN_API_BASE` is still used for PR security scans. Contributor trust scoring runs locally in this app and uses the GitHub App installation token to fetch profile and activity signals.
+
 ### 3. Install dependencies and run
 
 ```bash
@@ -112,6 +114,8 @@ src/
 ├── services/
 │   ├── prScan.ts               # PR scan orchestration
 │   ├── contributorTrust.ts     # Contributor trust orchestration
+│   ├── contributorScanner.ts   # Local contributor scoring facade
+│   ├── githubContributor.ts    # GitHub profile/activity signal collection
 │   ├── checkRuns.ts            # GitHub Check Runs API wrapper
 │   ├── comments.ts             # Marker-based comment management + rendering
 │   ├── labels.ts               # Label ensure/set logic
@@ -120,7 +124,8 @@ src/
     ├── env.ts                  # Environment variable validation
     ├── logger.ts               # Structured logging (pino)
     ├── types.ts                # Shared types, constants, label/marker defs
-    ├── brinApi.ts              # Brin API HTTP client
+    ├── brinApi.ts              # Brin PR API HTTP client
+    ├── contributorScoring.ts   # Contributor scoring formulas
     └── policy.ts               # Verdict evaluation and threshold logic
 ```
 
