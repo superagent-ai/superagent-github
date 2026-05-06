@@ -19,12 +19,13 @@ Results are surfaced as:
 ### Verdict flow
 
 
-| Verdict                | Check run | Label                                  | Comment | Blocks merge |
-| ---------------------- | --------- | -------------------------------------- | ------- | ------------ |
-| clean / safe           | success   | `pr:verified` / `contributor:verified` | removed | no           |
-| suspicious / caution   | neutral   | `pr:flagged` / `contributor:flagged`   | posted  | no           |
-| dangerous / score < 30 | failure   | `pr:flagged` / `contributor:flagged`   | posted  | yes          |
-| pending deep scan      | neutral   | --                                     | --      | no           |
+| Result                            | Check run | Label                                  | Comment | Blocks merge |
+| --------------------------------- | --------- | -------------------------------------- | ------- | ------------ |
+| PR clean / contributor score >= 30 | success   | `pr:verified` / `contributor:verified` | removed | no           |
+| PR suspicious                     | neutral   | `pr:flagged`                           | posted  | no           |
+| PR dangerous or score < 30        | failure   | `pr:flagged`                           | posted  | yes          |
+| contributor score < 30            | failure   | `contributor:flagged`                  | posted  | yes          |
+| pending deep scan                 | neutral   | --                                     | --      | no           |
 
 
 ## Setup
@@ -88,7 +89,7 @@ prScan:
 
 contributorTrust:
   enabled: true
-  safeVerdicts: [safe]
+  blockBelowScore: 30
   trustedAuthors: [dependabot[bot], renovate[bot]]
 
 comments:

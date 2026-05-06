@@ -36,5 +36,5 @@ export function evaluateContributor(
   if (result.score == null) {
     return { isSafe: true };
   }
-  return { isSafe: config.contributorTrust.safeVerdicts.includes(result.verdict ?? "") };
+  return { isSafe: result.score >= config.contributorTrust.blockBelowScore };
 }

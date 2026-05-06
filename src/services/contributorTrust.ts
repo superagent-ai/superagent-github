@@ -83,7 +83,7 @@ export async function runContributorTrust(
     );
     await deleteMarkerComment(octokit, owner, repo, prNumber, MARKERS.CONTRIBUTOR_TRUST);
   } else {
-    const conclusion = result.verdict === "dangerous" ? ("failure" as const) : ("neutral" as const);
+    const conclusion = "failure" as const;
     await completeCheck(octokit, owner, repo, checkRunId, conclusion, {
       title: "Contributor flagged for review",
       summary: `Score: ${result.score}/100 \u00b7 Verdict: ${result.verdict}`,

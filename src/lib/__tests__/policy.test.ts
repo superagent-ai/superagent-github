@@ -121,18 +121,18 @@ describe("evaluateContributor", () => {
     expect(evaluateContributor(result, config)).toEqual({ isSafe: true });
   });
 
-  it("returns not safe for a suspicious verdict", () => {
-    const result: ContributorResult = { score: 35, verdict: "suspicious" };
-    expect(evaluateContributor(result, config)).toEqual({ isSafe: false });
+  it("returns safe for a suspicious verdict when score is above threshold", () => {
+    const result: ContributorResult = { score: 68, verdict: "suspicious" };
+    expect(evaluateContributor(result, config)).toEqual({ isSafe: true });
   });
 
-  it("returns not safe for a dangerous verdict", () => {
-    const result: ContributorResult = { score: 10, verdict: "dangerous" };
-    expect(evaluateContributor(result, config)).toEqual({ isSafe: false });
-  });
-
-  it("returns not safe for a caution verdict", () => {
+  it("returns safe for a caution verdict when score is above threshold", () => {
     const result: ContributorResult = { score: 50, verdict: "caution" };
+    expect(evaluateContributor(result, config)).toEqual({ isSafe: true });
+  });
+
+  it("returns not safe when score is below threshold", () => {
+    const result: ContributorResult = { score: 10, verdict: "dangerous" };
     expect(evaluateContributor(result, config)).toEqual({ isSafe: false });
   });
 
@@ -141,12 +141,12 @@ describe("evaluateContributor", () => {
     expect(evaluateContributor(result, config)).toEqual({ isSafe: true });
   });
 
-  it("respects custom safeVerdicts", () => {
+  it("respects custom blockBelowScore threshold", () => {
     const custom: RepoConfig = {
       ...config,
-      contributorTrust: { ...config.contributorTrust, safeVerdicts: ["safe", "caution"] },
+      contributorTrust: { ...config.contributorTrust, blockBelowScore: 70 },
     };
-    const result: ContributorResult = { score: 50, verdict: "caution" };
-    expect(evaluateContributor(result, custom)).toEqual({ isSafe: true });
+    const result: ContributorResult = { score: 68, verdict: "safe" };
+    expect(evaluateContributor(result, custom)).toEqual({ isSafe: false });
   });
 });

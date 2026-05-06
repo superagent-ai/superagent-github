@@ -40,7 +40,7 @@ contributorTrust:
     expect(config.prScan.enabled).toBe(true);
     expect(config.prScan.tolerance).toBe("conservative");
     expect(config.contributorTrust.trustedAuthors).toEqual(["mybot[bot]"]);
-    expect(config.contributorTrust.safeVerdicts).toEqual(["safe"]);
+    expect(config.contributorTrust.blockBelowScore).toBe(30);
   });
 
   it("handles disabled scans", async () => {

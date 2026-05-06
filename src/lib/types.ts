@@ -70,7 +70,7 @@ export interface RepoConfig {
   };
   contributorTrust: {
     enabled: boolean;
-    safeVerdicts: string[];
+    blockBelowScore: number;
     trustedAuthors: string[];
   };
   comments: {
@@ -87,7 +87,7 @@ export const DEFAULT_CONFIG: RepoConfig = {
   },
   contributorTrust: {
     enabled: true,
-    safeVerdicts: ["safe"],
+    blockBelowScore: 30,
     trustedAuthors: ["dependabot[bot]", "renovate[bot]"],
   },
   comments: {
