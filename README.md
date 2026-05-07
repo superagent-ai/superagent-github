@@ -1,6 +1,6 @@
-# Brin GitHub App
+# Superagent GitHub App
 
-A GitHub App that automatically scans pull requests for security threats using the [Brin](https://brin.sh) API and evaluates contributor trust profiles directly inside the app.
+A GitHub App that automatically scans pull requests for security threats and evaluates contributor trust profiles.
 
 ## What it does
 
@@ -39,7 +39,7 @@ Create a new GitHub App at `https://github.com/settings/apps/new` with these set
 - Checks: Read & Write
 - Pull requests: Read & Write
 - Issues: Read & Write (for PR comments)
-- Contents: Read (for `.github/brin.yml` config)
+- Contents: Read (for repository config)
 - Metadata: Read
 
 **Webhook events:**
@@ -61,7 +61,7 @@ PRIVATE_KEY=<contents of your .pem file, with literal \n for newlines>
 WEBHOOK_SECRET=<the secret you set when creating the app>
 ```
 
-`BRIN_API_BASE` is still used for PR security scans. Contributor trust scoring runs locally in this app and uses the GitHub App installation token to fetch profile and activity signals.
+Contributor trust scoring runs locally in this app and uses the GitHub App installation token to fetch profile and activity signals.
 
 ### 3. Install dependencies and run
 
@@ -80,7 +80,7 @@ Go to your app's installation page and install it on the repositories you want t
 
 ## Repo configuration
 
-Repositories can optionally add a `.github/brin.yml` file to customize behavior:
+Repositories can optionally add a configuration file to customize behavior:
 
 ```yaml
 prScan:
@@ -119,19 +119,18 @@ src/
 │   ├── checkRuns.ts            # GitHub Check Runs API wrapper
 │   ├── comments.ts             # Marker-based comment management + rendering
 │   ├── labels.ts               # Label ensure/set logic
-│   └── config.ts               # .github/brin.yml loader
+│   └── config.ts               # Repository config loader
 └── lib/
     ├── env.ts                  # Environment variable validation
     ├── logger.ts               # Structured logging (pino)
     ├── types.ts                # Shared types, constants, label/marker defs
-    ├── brinApi.ts              # Brin PR API HTTP client
     ├── contributorScoring.ts   # Contributor scoring formulas
     └── policy.ts               # Verdict evaluation and threshold logic
 ```
 
 ## Re-running checks
 
-Maintainers can re-run any Brin check from the GitHub UI by clicking "Re-run" on the check run. The app handles `check_run.rerequested` events and re-executes the corresponding scan.
+Maintainers can re-run any Superagent check from the GitHub UI by clicking "Re-run" on the check run. The app handles `check_run.rerequested` events and re-executes the corresponding scan.
 
 ## Development
 
