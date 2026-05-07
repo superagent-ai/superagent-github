@@ -34,6 +34,12 @@ db.exec(`
     added_at        TEXT    NOT NULL DEFAULT (datetime('now')),
     UNIQUE(installation_id, repo_full_name)
   );
+
+  CREATE TABLE IF NOT EXISTS contributor_scans (
+    login       TEXT PRIMARY KEY,
+    result_json TEXT NOT NULL,
+    scanned_at  TEXT NOT NULL
+  );
 `);
 
 logger.info({ path: env.dbPath }, "Database initialized");
@@ -97,6 +103,20 @@ export const queries: Record<string, Statement> = {
       SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active,
       SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END) as removed
     FROM installations
+  `),
+
+  getContributorScan: db.prepare(`
+    SELECT result_json as resultJson, scanned_at as scannedAt
+    FROM contributor_scans
+    WHERE login = @login
+  `),
+
+  upsertContributorScan: db.prepare(`
+    INSERT INTO contributor_scans (login, result_json, scanned_at)
+    VALUES (@login, @resultJson, @scannedAt)
+    ON CONFLICT(login) DO UPDATE SET
+      result_json = @resultJson,
+      scanned_at  = @scannedAt
   `),
 };
 

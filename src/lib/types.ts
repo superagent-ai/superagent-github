@@ -55,7 +55,6 @@ export interface ContributorResult {
     identity?: number;
     behavior?: number;
     content?: number;
-    graph?: number;
   };
 }
 
