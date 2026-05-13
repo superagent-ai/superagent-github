@@ -118,6 +118,35 @@ describe("runPrScan", () => {
       expect.objectContaining({ comment_id: 100 }),
     );
   });
+
+  it("leaves the PR unverified when the scanner reports an inconclusive error", async () => {
+    stubScanFetch({
+      error: "PR patch for package.json exceeds the 8000 character per-file scan limit",
+    });
+    const octokit = mockOctokit([{ id: 99, body: "<!-- brin-pr-scan --> old comment" }]);
+
+    await runPrScan(octokit, {
+      owner: "acme",
+      repo: "repo",
+      prNumber: 12,
+      headSha: "abc123",
+      config: DEFAULT_CONFIG,
+    });
+
+    expect(octokit.rest.checks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conclusion: "neutral",
+        output: expect.objectContaining({
+          title: "Scan inconclusive",
+          summary: "PR patch for package.json exceeds the 8000 character per-file scan limit",
+        }),
+      }),
+    );
+    expect(octokit.rest.issues.setLabels).toHaveBeenCalledWith(
+      expect.objectContaining({ labels: ["keep"] }),
+    );
+    expect(octokit.rest.pulls.createReview).not.toHaveBeenCalled();
+  });
 });
 
 function stubScanFetch(scanResult: unknown) {
