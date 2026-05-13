@@ -57,6 +57,7 @@ type PrScanPayload = {
 };
 
 export default async function ({ init, payload, env }: FlueContext) {
+  const envSource = toEnvSource(env);
   const sandbox = await createDaytonaSandbox(env);
   const workspacePath = await getWorkspacePath(sandbox);
   await seedCiCdSkill(sandbox, workspacePath);
@@ -64,7 +65,7 @@ export default async function ({ init, payload, env }: FlueContext) {
   const harness = await init({
     sandbox: daytona(sandbox),
     cwd: workspacePath,
-    model: getAzureKimiModel(),
+    model: getAzureKimiModel(envSource),
   });
   const session = await harness.session();
   const pr = normalizePayload(payload);

@@ -78,7 +78,7 @@ class DaytonaSandboxApi implements SandboxApi {
     return {
       stdout: response.result ?? "",
       stderr: "",
-      exitCode: response.exitCode ?? 0,
+      exitCode: response.exitCode ?? (response.result == null ? 1 : 0),
     };
   }
 }
