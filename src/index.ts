@@ -6,6 +6,7 @@ import { registerEventHandlers } from "./events/index.js";
 import { env } from "./lib/env.js";
 import { logger } from "./lib/logger.js";
 import { queries, saveInstallation } from "./lib/db.js";
+import { requireAdminApiToken } from "./lib/adminAuth.js";
 
 registerEventHandlers(githubApp);
 
@@ -73,7 +74,7 @@ server.post("/api/github/marketplace", async (c) => {
   return c.json({ ok: true });
 });
 
-server.post("/api/installations/sync", async (c) => {
+server.post("/api/installations/sync", requireAdminApiToken, async (c) => {
   try {
     let synced = 0;
 
@@ -116,7 +117,7 @@ server.post("/api/installations/sync", async (c) => {
   }
 });
 
-server.get("/api/installations", (c) => {
+server.get("/api/installations", requireAdminApiToken, (c) => {
   const all = c.req.query("all") === "true";
   const rows = all
     ? queries.getAllInstallations.all()
