@@ -4,40 +4,48 @@ import { MARKERS } from "../../lib/types.js";
 import type { PrScanResult, ContributorResult } from "../../lib/types.js";
 
 describe("renderPrScanComment", () => {
-  it("renders blocking comment with threats", () => {
+  it("renders an actionable findings comment", () => {
     const result: PrScanResult = {
-      score: 15,
-      verdict: "dangerous",
-      threats: [
-        { type: "credential_exposure", detail: "Hardcoded API key in config.ts" },
-        { type: "obfuscation", detail: "Base64-encoded payload in build script" },
+      findings: [
+        {
+          category: "ci_cd",
+          severity: "critical",
+          title: "pull_request_target checks out fork code",
+          file: ".github/workflows/ci.yml",
+          line: 12,
+          evidence: "Workflow uses pull_request_target with checkout of the PR head SHA.",
+          recommendation: "Use pull_request for untrusted code or move privileged commenting into this GitHub App.",
+        },
+        {
+          category: "malicious_intent",
+          severity: "high",
+          title: "Encoded payload added to build script",
+          file: "scripts/build.js",
+          evidence: "New build script decodes and executes a base64 payload.",
+          recommendation: "Remove the encoded payload and replace it with reviewable source code.",
+        },
       ],
     };
-    const body = renderPrScanComment("blocking", result);
+    const body = renderPrScanComment("review", result);
 
     expect(body).toContain(MARKERS.PR_SCAN);
-    expect(body).toContain("### Brin PR Security Scan");
-    expect(body).toContain("should block merge");
-    expect(body).toContain("**Score:** 15/100");
-    expect(body).toContain("**Verdict:** dangerous");
-    expect(body).toContain("credential_exposure: Hardcoded API key in config.ts");
-    expect(body).toContain("obfuscation: Base64-encoded payload in build script");
-    expect(body).toContain("Analyzed by [Brin]");
+    expect(body).toContain("### Superagent Security Scan");
+    expect(body).toContain("suspicious changes");
+    expect(body).not.toContain("Score");
+    expect(body).not.toContain("Verdict");
+    expect(body).toContain("[CRITICAL] pull_request_target checks out fork code");
+    expect(body).toContain("**Category:** CI/CD");
+    expect(body).toContain("`.github/workflows/ci.yml:12`");
+    expect(body).toContain("Use pull_request for untrusted code");
+    expect(body).toContain("[HIGH] Encoded payload added to build script");
+    expect(body).toContain("Analyzed by [Superagent]");
   });
 
-  it("renders review comment", () => {
-    const result: PrScanResult = { score: 45, verdict: "suspicious" };
+  it("renders without finding sections when none are present", () => {
+    const result: PrScanResult = { findings: [] };
     const body = renderPrScanComment("review", result);
 
-    expect(body).toContain("should be reviewed");
-    expect(body).not.toContain("should block merge");
-  });
-
-  it("renders without threats section when none present", () => {
-    const result: PrScanResult = { score: 40, verdict: "suspicious" };
-    const body = renderPrScanComment("review", result);
-
-    expect(body).not.toContain("**Findings:**");
+    expect(body).not.toContain("#### [");
   });
 });
 
@@ -47,7 +55,7 @@ describe("renderContributorTrustComment", () => {
       score: 25,
       verdict: "suspicious",
       name: "sketchy-user",
-      url: "https://brin.sh/contributor/sketchy-user",
+      url: "https://superagent.sh/contributor/sketchy-user",
       threats: [
         { type: "new_account", severity: "high", detail: "Account created less than 30 days ago" },
       ],
@@ -72,7 +80,7 @@ describe("renderContributorTrustComment", () => {
     expect(body).toContain("| Behavior | 30 |");
     expect(body).toContain("| Content | 40 |");
     expect(body).not.toContain("| Graph |");
-    expect(body).toContain("[Full profile](https://brin.sh/contributor/sketchy-user?details=true)");
+    expect(body).toContain("[Full profile](https://superagent.sh/contributor/sketchy-user?details=true)");
   });
 
   it("renders without threats section when empty", () => {
@@ -108,7 +116,7 @@ describe("renderContributorTrustComment", () => {
     const body = renderContributorTrustComment(result);
 
     expect(body).not.toContain("Full profile");
-    expect(body).toContain("Analyzed by [Brin]");
+    expect(body).toContain("Analyzed by [Superagent]");
   });
 
   it("uses correct emoji for each verdict", () => {

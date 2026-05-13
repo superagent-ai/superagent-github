@@ -6,108 +6,38 @@ import type { PrScanResult, ContributorResult, RepoConfig } from "../types.js";
 describe("evaluatePrScan", () => {
   const config = DEFAULT_CONFIG;
 
-  it("returns blocking when verdict is dangerous", () => {
-    const result: PrScanResult = { score: 20, verdict: "dangerous" };
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "blocking",
-      shouldFail: true,
-    });
-  });
-
-  it("returns blocking when score is below threshold", () => {
-    const result: PrScanResult = { score: 15, verdict: "suspicious" };
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "blocking",
-      shouldFail: true,
-    });
-  });
-
-  it("returns blocking for score 0", () => {
-    const result: PrScanResult = { score: 0, verdict: "unknown" };
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "blocking",
-      shouldFail: true,
-    });
-  });
-
-  it("returns review when verdict is suspicious and score is above threshold", () => {
-    const result: PrScanResult = { score: 45, verdict: "suspicious" };
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "review",
-      shouldFail: false,
-    });
-  });
-
-  it("returns clean for a safe PR", () => {
-    const result: PrScanResult = { score: 85, verdict: "safe" };
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "clean",
-      shouldFail: false,
-    });
-  });
-
-  it("returns inconclusive when score is null", () => {
-    const result: PrScanResult = {};
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "inconclusive",
-      shouldFail: false,
-    });
-  });
-
-  it("returns inconclusive when pending_deep_scan is true", () => {
-    const result: PrScanResult = { score: 50, verdict: "safe", pending_deep_scan: true };
-    expect(evaluatePrScan(result, config)).toEqual({
-      status: "inconclusive",
-      shouldFail: false,
-    });
-  });
-
-  it("returns inconclusive when Brin reports an internal scan error", () => {
+  it("returns review when the scan has findings", () => {
     const result: PrScanResult = {
-      score: 0,
-      verdict: "dangerous",
-      threats: [
+      findings: [
         {
-          type: "scan_error",
-          detail: "failed to fetch PR: GitHub API returned 404",
+          category: "malicious_intent",
+          severity: "high",
+          title: "Suspicious network exfiltration",
+          file: "src/index.ts",
+          evidence: "New code sends process.env to an external host.",
+          recommendation: "Remove the exfiltration path and rotate exposed credentials.",
         },
       ],
     };
 
     expect(evaluatePrScan(result, config)).toEqual({
-      status: "inconclusive",
-      shouldFail: false,
-    });
-  });
-
-  it("respects custom blockBelowScore threshold", () => {
-    const custom: RepoConfig = {
-      ...config,
-      prScan: { ...config.prScan, blockBelowScore: 50 },
-    };
-    const result: PrScanResult = { score: 45, verdict: "safe" };
-    expect(evaluatePrScan(result, custom)).toEqual({
-      status: "blocking",
-      shouldFail: true,
-    });
-  });
-
-  it("respects custom suspiciousVerdicts", () => {
-    const custom: RepoConfig = {
-      ...config,
-      prScan: { ...config.prScan, suspiciousVerdicts: ["suspicious", "caution"] },
-    };
-    const result: PrScanResult = { score: 60, verdict: "caution" };
-    expect(evaluatePrScan(result, custom)).toEqual({
       status: "review",
       shouldFail: false,
     });
   });
 
-  it("score exactly at threshold is not blocking", () => {
-    const result: PrScanResult = { score: 30, verdict: "safe" };
+  it("returns clean when the scan has no findings", () => {
+    const result: PrScanResult = { findings: [] };
     expect(evaluatePrScan(result, config)).toEqual({
       status: "clean",
+      shouldFail: false,
+    });
+  });
+
+  it("returns inconclusive when the scan reports an error", () => {
+    const result: PrScanResult = { error: "Flue scan failed" };
+    expect(evaluatePrScan(result, config)).toEqual({
+      status: "inconclusive",
       shouldFail: false,
     });
   });

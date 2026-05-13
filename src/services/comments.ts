@@ -62,26 +62,33 @@ export function renderPrScanComment(
   status: PrStatus,
   result: PrScanResult,
 ): string {
-  const headline =
-    status === "blocking"
-      ? "This PR has findings that should block merge."
-      : "This PR has findings that should be reviewed.";
+  const findings = result.findings ?? [];
 
-  let body = `${MARKERS.PR_SCAN}\n### Brin PR Security Scan\n\n`;
-  body += `${headline}\n\n`;
-  body += `- **Score:** ${result.score}/100\n`;
-  body += `- **Verdict:** ${result.verdict}\n\n`;
+  let body = `${MARKERS.PR_SCAN}\n### Superagent Security Scan\n\n`;
+  body += `This PR has suspicious changes that should be reviewed before merge.\n\n`;
 
-  if (result.threats?.length) {
-    body += `**Findings:**\n`;
-    for (const t of result.threats) {
-      body += `- ${t.type}: ${t.detail}\n`;
+  for (const finding of findings) {
+    body += `#### [${finding.severity.toUpperCase()}] ${finding.title}\n\n`;
+    body += `- **Category:** ${formatFindingCategory(finding.category)}\n`;
+    if (finding.file) {
+      body += `- **Location:** \`${finding.file}`;
+      if (finding.line != null) body += `:${finding.line}`;
+      body += `\`\n`;
     }
-    body += `\n`;
+    body += `- **Evidence:** ${finding.evidence}\n`;
+    body += `- **Recommended fix:** ${finding.recommendation}\n\n`;
   }
 
-  body += `<sub>Analyzed by [Brin](https://brin.sh)</sub>`;
+  body += `<sub>Analyzed by [Superagent](https://superagent.sh)</sub>`;
   return body;
+}
+
+function formatFindingCategory(category: string): string {
+  if (category === "ci_cd") return "CI/CD";
+  return category
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function renderContributorTrustComment(
@@ -119,7 +126,7 @@ export function renderContributorTrustComment(
   body += `\n`;
   body += `</details>\n\n`;
 
-  body += `<sub>Analyzed by [Brin](https://brin.sh)`;
+  body += `<sub>Analyzed by [Superagent](https://superagent.sh)`;
   if (result.url) {
     body += ` \u00b7 [Full profile](${result.url}?details=true)`;
   }

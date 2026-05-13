@@ -4,6 +4,17 @@ export interface CheckOutput {
   title: string;
   summary: string;
   text?: string;
+  annotations?: CheckAnnotation[];
+}
+
+export interface CheckAnnotation {
+  path: string;
+  start_line: number;
+  end_line: number;
+  annotation_level: "notice" | "warning" | "failure";
+  title: string;
+  message: string;
+  raw_details?: string;
 }
 
 export async function createInProgressCheck(

@@ -6,23 +6,29 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/start.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "flue:build": "flue build --target node --output .flue-dist",
+    "flue:run:pr-scan": "flue run pr-scan --target node --output .flue-dist --env .env --id local-pr-scan --payload '{}'"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18.0"
   },
   "dependencies": {
+    "@daytona/sdk": "^0.175.0",
+    "@flue/sdk": "^0.5.3",
     "@hono/node-server": "^1.19.12",
     "better-sqlite3": "^12.9.0",
     "hono": "^4.12.10",
     "octokit": "^5.0.5",
     "pino": "^10.3.1",
+    "valibot": "^1.0.0",
     "yaml": "^2.8.3"
   },
   "devDependencies": {
+    "@flue/cli": "^0.5.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.5.1",
     "tsx": "^4.21.0",
