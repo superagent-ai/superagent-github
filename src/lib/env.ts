@@ -14,9 +14,6 @@ export const env = {
   get webhookSecret() {
     return required("WEBHOOK_SECRET");
   },
-  get brinApiBase() {
-    return process.env.BRIN_API_BASE ?? "https://api.brin.sh";
-  },
   get port() {
     return parseInt(process.env.PORT ?? "3000", 10);
   },

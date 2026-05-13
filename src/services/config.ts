@@ -12,7 +12,7 @@ export async function loadConfig(
     const { data } = await octokit.rest.repos.getContent({
       owner,
       repo,
-      path: ".github/brin.yml",
+      path: ".github/superagent.yml",
     });
 
     if ("content" in data && data.content) {
@@ -23,7 +23,7 @@ export async function loadConfig(
   } catch (err: unknown) {
     const status = err && typeof err === "object" && "status" in err ? err.status : undefined;
     if (status !== 404) {
-      logger.warn({ err, owner, repo }, "Failed to load .github/brin.yml");
+      logger.warn({ err, owner, repo }, "Failed to load .github/superagent.yml");
     }
   }
   return DEFAULT_CONFIG;

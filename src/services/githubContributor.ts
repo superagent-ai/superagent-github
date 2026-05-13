@@ -7,7 +7,7 @@ import {
 
 const GITHUB_API = "https://api.github.com";
 const GITHUB_API_VERSION = "2022-11-28";
-const USER_AGENT = "brin-github/0.1";
+const USER_AGENT = "superagent-github/0.1";
 const REQUEST_TIMEOUT_MS = 30_000;
 const ISSUE_REF_RE = /#\d+/;
 

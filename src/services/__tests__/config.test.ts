@@ -28,7 +28,7 @@ describe("loadConfig", () => {
   it("merges partial config with defaults", async () => {
     const yaml = `
 prScan:
-  blockBelowScore: 50
+  enabled: false
 contributorTrust:
   trustedAuthors:
     - mybot[bot]
@@ -36,9 +36,7 @@ contributorTrust:
     const octokit = mockOctokit(yaml);
     const config = await loadConfig(octokit, "owner", "repo");
 
-    expect(config.prScan.blockBelowScore).toBe(50);
-    expect(config.prScan.enabled).toBe(true);
-    expect(config.prScan.tolerance).toBe("conservative");
+    expect(config.prScan.enabled).toBe(false);
     expect(config.contributorTrust.trustedAuthors).toEqual(["mybot[bot]"]);
     expect(config.contributorTrust.blockBelowScore).toBe(30);
   });

@@ -1,32 +1,33 @@
 export const CHECK_NAMES = {
-  PR_SCAN: "Brin PR Scan",
-  CONTRIBUTOR_TRUST: "Brin Contributor Trust",
+  PR_SCAN: "Security scan",
+  CONTRIBUTOR_TRUST: "Contributor trust",
 } as const;
 
 export const MARKERS = {
   PR_SCAN: "<!-- brin-pr-scan -->",
+  PR_FINDING: "<!-- brin-pr-finding -->",
   CONTRIBUTOR_TRUST: "<!-- brin-check -->",
 } as const;
 
 export const LABEL_DEFS = {
   PR_VERIFIED: {
     name: "pr:verified",
-    color: "0969da",
+    color: "0075b6",
     description: "PR passed security analysis.",
   },
   PR_FLAGGED: {
     name: "pr:flagged",
-    color: "e16f24",
+    color: "b0237d",
     description: "PR flagged for review by security analysis.",
   },
   CONTRIBUTOR_VERIFIED: {
     name: "contributor:verified",
-    color: "0969da",
+    color: "0075b6",
     description: "Contributor passed trust analysis.",
   },
   CONTRIBUTOR_FLAGGED: {
     name: "contributor:flagged",
-    color: "e16f24",
+    color: "b0237d",
     description: "Contributor flagged for review by trust analysis.",
   },
 } as const;
@@ -37,11 +38,24 @@ export interface LabelDef {
   description: string;
 }
 
+export type PrFindingCategory = "ci_cd" | "lifecycle" | "malicious_intent";
+export type PrFindingSeverity = "critical" | "high" | "medium" | "low";
+
+export interface PrFinding {
+  category: PrFindingCategory;
+  severity: PrFindingSeverity;
+  title: string;
+  file?: string;
+  line?: number;
+  evidence: string;
+  recommendation: string;
+  short_evidence?: string;
+  short_recommendation?: string;
+}
+
 export interface PrScanResult {
-  score?: number;
-  verdict?: string;
-  pending_deep_scan?: boolean;
-  threats?: Array<{ type: string; detail: string; severity?: string }>;
+  findings?: PrFinding[];
+  error?: string;
 }
 
 export interface ContributorResult {
@@ -58,14 +72,11 @@ export interface ContributorResult {
   };
 }
 
-export type PrStatus = "blocking" | "review" | "clean" | "inconclusive";
+export type PrStatus = "review" | "clean" | "inconclusive";
 
 export interface RepoConfig {
   prScan: {
     enabled: boolean;
-    blockBelowScore: number;
-    suspiciousVerdicts: string[];
-    tolerance: string;
   };
   contributorTrust: {
     enabled: boolean;
@@ -80,9 +91,6 @@ export interface RepoConfig {
 export const DEFAULT_CONFIG: RepoConfig = {
   prScan: {
     enabled: true,
-    blockBelowScore: 30,
-    suspiciousVerdicts: ["suspicious"],
-    tolerance: "conservative",
   },
   contributorTrust: {
     enabled: true,

@@ -135,5 +135,5 @@ server.get("/api/installations", (c) => {
 server.get("/health", (c) => c.json({ status: "ok" }));
 
 serve({ fetch: server.fetch, port: env.port }, () => {
-  logger.info({ port: env.port }, "Brin GitHub App listening");
+  logger.info({ port: env.port }, "Superagent GitHub App listening");
 });
