@@ -12,22 +12,22 @@ export const MARKERS = {
 export const LABEL_DEFS = {
   PR_VERIFIED: {
     name: "pr:verified",
-    color: "0969da",
+    color: "0075b6",
     description: "PR passed security analysis.",
   },
   PR_FLAGGED: {
     name: "pr:flagged",
-    color: "e16f24",
+    color: "b0237d",
     description: "PR flagged for review by security analysis.",
   },
   CONTRIBUTOR_VERIFIED: {
     name: "contributor:verified",
-    color: "0969da",
+    color: "0075b6",
     description: "Contributor passed trust analysis.",
   },
   CONTRIBUTOR_FLAGGED: {
     name: "contributor:flagged",
-    color: "e16f24",
+    color: "b0237d",
     description: "Contributor flagged for review by trust analysis.",
   },
 } as const;
