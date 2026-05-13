@@ -1,33 +1,40 @@
-# Superagent GitHub App
+# Superagent Security Bot for GitHub
 
-A GitHub App that automatically scans pull requests for security threats and evaluates contributor trust profiles.
+Superagent is a GitHub App that reviews pull requests for security risk before they merge. It looks for suspicious code, risky CI/CD changes, malicious package hooks, and contributor signals that deserve a maintainer's attention.
 
-## What it does
+Install it on a public or private repository and Superagent becomes a security reviewer that shows up directly in the PR: check runs, inline comments, and labels that your existing branch protection rules can use.
 
-When installed on a repository, the app reacts to pull request events and runs two parallel checks:
+## Why teams use it
 
-**PR Security Scan** -- Analyzes the PR diff for suspicious CI/CD changes, malicious lifecycle hooks, and general indicators of malicious intent. It reports security concerns only, with no PR score or verdict.
+- **Catch risky pull requests early.** Superagent scans diffs for malicious intent, vulnerable patterns, suspicious automation changes, and supply-chain attack techniques.
+- **Review contributor trust signals.** It checks whether a PR author looks established, consistent, and relevant to the project before giving them the benefit of the doubt.
+- **Enforce security basics automatically.** It helps maintainers spot dangerous GitHub Actions edits, lifecycle hooks, and Shai-Hulud-style dependency attacks.
+- **Meet maintainers where they work.** Results appear as GitHub check runs, review comments, and labels, so teams do not need a new dashboard to adopt it.
 
-**Contributor Trust Check** -- Evaluates the PR author's GitHub profile across identity, behavior, and content dimensions to flag accounts that warrant additional review.
+## How it works
 
-Results are surfaced as:
+When a pull request opens or updates, Superagent runs two checks in parallel:
 
-- **Check runs** on the PR commit (pass/fail/neutral) that integrate with branch protection rules
-- **PR review comments** with inline security concerns
-- **Labels** (`pr:verified`, `pr:flagged`, `contributor:verified`, `contributor:flagged`)
+**PR Security Scan** -- Reviews the PR diff for suspicious CI/CD changes, malicious lifecycle hooks, vulnerable patterns, and other indicators of malicious intent. It reports concrete security concerns only, without assigning an opaque PR score.
+
+**Contributor Trust Check** -- Evaluates the PR author's GitHub profile across identity, behavior, and content signals to flag accounts that may need extra maintainer review.
+
+Superagent then updates the PR with:
+
+- **Check runs** on the PR commit that can pass, fail, or stay neutral
+- **Inline review comments** for specific security concerns
+- **Labels** such as `pr:verified`, `pr:flagged`, `contributor:verified`, and `contributor:flagged`
 
 ### Result flow
 
+| Result                                      | Check run       | Label                                  | Comment                | Blocks merge |
+| ------------------------------------------- | --------------- | -------------------------------------- | ---------------------- | ------------ |
+| PR has no findings / contributor score >= 30 | success         | `pr:verified` / `contributor:verified` | removed                | no           |
+| PR has security concerns                    | action required | `pr:flagged`                           | inline review comments | yes          |
+| Contributor score < 30                      | failure         | `contributor:flagged`                  | posted                 | yes          |
+| PR scan inconclusive                        | neutral         | --                                     | --                     | no           |
 
-| Result                            | Check run | Label                                  | Comment | Blocks merge |
-| --------------------------------- | --------- | -------------------------------------- | ------- | ------------ |
-| PR has no findings / contributor score >= 30 | success   | `pr:verified` / `contributor:verified` | removed | no           |
-| PR has security concerns          | action required | `pr:flagged`                     | inline review comments | yes |
-| contributor score < 30            | failure   | `contributor:flagged`                  | posted  | yes          |
-| PR scan inconclusive              | neutral   | --                                     | --      | no           |
-
-
-## Setup
+## Quick start
 
 ### 1. Register a GitHub App
 
@@ -78,13 +85,13 @@ npm run flue:build
 npm start        # run compiled app and internal Flue service
 ```
 
-The GitHub App starts on port 3000 by default (override with `PORT` env var). The internal Flue service starts on `FLUE_PORT` (default `3583`) and the app calls it via `FLUE_BASE_URL` (default `http://127.0.0.1:3583`). Flue currently requires Node 22.18 or newer.
+The GitHub App starts on port 3000 by default. Override it with the `PORT` environment variable. The internal Flue service starts on `FLUE_PORT` (default `3583`) and the app calls it through `FLUE_BASE_URL` (default `http://127.0.0.1:3583`). Flue currently requires Node 22.18 or newer.
 
 ### 4. Install the app on repositories
 
 Go to your app's installation page and install it on the repositories you want to protect.
 
-## Repo configuration
+## Repository configuration
 
 Repositories can optionally add `.github/superagent.yml` to customize behavior:
 
