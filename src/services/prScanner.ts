@@ -1,7 +1,8 @@
 import type { PrFinding, PrScanResult } from "../lib/types.js";
 import { childLogger } from "../lib/logger.js";
 
-const MAX_FILES = 100;
+const GITHUB_PR_FILES_PER_PAGE = 100;
+const GITHUB_PR_FILES_PAGE_LIMIT = 30;
 const MAX_PATCH_CHARS_PER_FILE = 8_000;
 const MAX_PAYLOAD_CHARS = 100_000;
 
@@ -99,7 +100,7 @@ async function collectPrScanPayload(
       headSha: pullRequest.head?.sha ?? "",
       headRepo: pullRequest.head?.repo?.full_name ?? "",
     },
-    files: trimPayloadFiles(files.slice(0, MAX_FILES)),
+    files: trimPayloadFiles(files),
   };
 }
 
@@ -110,15 +111,22 @@ async function fetchPrFiles(
   githubToken?: string,
 ): Promise<GitHubPrFile[]> {
   const files: GitHubPrFile[] = [];
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; page <= GITHUB_PR_FILES_PAGE_LIMIT; page++) {
     const pageFiles = await fetchGitHub<GitHubPrFile[]>(
-      `/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100&page=${page}`,
+      `/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=${GITHUB_PR_FILES_PER_PAGE}&page=${page}`,
       githubToken,
     );
     files.push(...pageFiles);
-    if (pageFiles.length < 100 || files.length >= MAX_FILES) break;
+    if (pageFiles.length < GITHUB_PR_FILES_PER_PAGE) break;
+
+    if (page === GITHUB_PR_FILES_PAGE_LIMIT) {
+      const fileLimit = GITHUB_PR_FILES_PER_PAGE * GITHUB_PR_FILES_PAGE_LIMIT;
+      throw new Error(
+        `PR file list reached GitHub's ${fileLimit} file scan limit`,
+      );
+    }
   }
-  return files.slice(0, MAX_FILES);
+  return files;
 }
 
 async function fetchGitHub<T>(pathAndQuery: string, githubToken?: string): Promise<T> {
