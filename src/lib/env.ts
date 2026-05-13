@@ -20,6 +20,9 @@ export const env = {
   get marketplaceWebhookSecret() {
     return process.env.MARKETPLACE_WEBHOOK_SECRET ?? "";
   },
+  get adminApiToken() {
+    return process.env.ADMIN_API_TOKEN ?? "";
+  },
   get logLevel() {
     return process.env.LOG_LEVEL ?? "info";
   },
