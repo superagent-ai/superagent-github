@@ -46,12 +46,18 @@ type PrScanPayload = {
     headRef?: string;
     headRepo?: string;
   };
+  scan?: {
+    batch?: number;
+    batches?: number;
+  };
   files?: Array<{
     path: string;
     previousPath?: string;
     status: string;
     additions?: number;
     deletions?: number;
+    patchPart?: number;
+    patchParts?: number;
     patch?: string;
   }>;
 };
@@ -129,6 +135,8 @@ async function scanCiCdWorkflows(
       workflows: workflowFiles.map((file) => ({
         path: file.path,
         status: file.status,
+        patchPart: file.patchPart,
+        patchParts: file.patchParts,
         patch: file.patch ?? "",
       })),
     },
@@ -167,6 +175,7 @@ Do not flag ordinary refactors, formatting, harmless dependency updates, or expe
 
 Repository: ${pr.owner ?? ""}/${pr.repo ?? ""}
 PR: #${pr.prNumber ?? ""}
+Scan batch: ${pr.scan?.batch ?? 1} of ${pr.scan?.batches ?? 1}
 Title: ${pr.pullRequest?.title ?? ""}
 Author: ${pr.pullRequest?.author ?? ""}
 Base: ${pr.pullRequest?.baseRef ?? ""}
@@ -178,6 +187,7 @@ CI/CD skill findings:
 ${JSON.stringify(ciCdFindings, null, 2)}
 
 Changed files and patches:
+Large patches may appear as multiple records with the same path and patchPart/patchParts metadata. These parts are contiguous. Scan every part; no patch content has been omitted.
 ${JSON.stringify(pr.files, null, 2)}
 `;
 }

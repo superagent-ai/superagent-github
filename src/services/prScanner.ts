@@ -5,7 +5,6 @@ const GITHUB_PR_FILES_PER_PAGE = 100;
 const GITHUB_PR_FILES_PAGE_LIMIT = 30;
 const MAX_PATCH_CHARS_PER_FILE = 8_000;
 const MAX_PAYLOAD_CHARS = 100_000;
-const PATCH_TRUNCATION_MARKER_PREFIX = "\n\n[Superagent truncated ";
 
 interface GitHubPrFile {
   filename: string;
@@ -39,6 +38,10 @@ interface PrScanPayload {
     headSha: string;
     headRepo: string;
   };
+  scan?: {
+    batch: number;
+    batches: number;
+  };
   files: Array<{
     path: string;
     previousPath?: string;
@@ -46,6 +49,8 @@ interface PrScanPayload {
     additions: number;
     deletions: number;
     changes: number;
+    patchPart?: number;
+    patchParts?: number;
     patch: string;
   }>;
 }
@@ -65,7 +70,7 @@ export async function scanPrLocally(
 
   try {
     const payload = await collectPrScanPayload(owner, repo, prNumber, options.githubToken);
-    const result = await runFluePrScan(payload);
+    const result = await runFluePrScans(payload);
     log.info({ findings: result.findings?.length ?? 0 }, "Local Flue PR scan completed");
     return result;
   } catch (err) {
@@ -151,55 +156,84 @@ async function fetchGitHub<T>(pathAndQuery: string, githubToken?: string): Promi
 }
 
 function buildPayloadFiles(files: GitHubPrFile[]): PrScanPayload["files"] {
-  let remaining = MAX_PAYLOAD_CHARS;
-  return files.map((file) => {
-    const patch = truncatePatch(file.patch ?? "");
-    if (patch.length > remaining) {
-      throw new Error(
-        `Total PR patch payload exceeds the ${MAX_PAYLOAD_CHARS} character scan limit before fully scanning ${file.filename}`,
-      );
-    }
-    remaining -= patch.length;
+  return files.flatMap((file) => {
+    const patchChunks = splitPatch(file.patch ?? "", MAX_PATCH_CHARS_PER_FILE);
 
-    return {
+    return patchChunks.map((patch, index) => ({
       path: file.filename,
       previousPath: file.previous_filename,
       status: file.status,
       additions: file.additions ?? 0,
       deletions: file.deletions ?? 0,
       changes: file.changes ?? 0,
+      patchPart: patchChunks.length > 1 ? index + 1 : undefined,
+      patchParts: patchChunks.length > 1 ? patchChunks.length : undefined,
       patch,
-    };
+    }));
   });
 }
 
-function truncatePatch(patch: string): string {
-  if (patch.length <= MAX_PATCH_CHARS_PER_FILE) return patch;
+function splitPatch(patch: string, maxChars: number): string[] {
+  if (patch.length <= maxChars) return [patch];
 
-  let marker = buildPatchTruncationMarker(patch.length - MAX_PATCH_CHARS_PER_FILE);
-
-  while (true) {
-    const contentBudget = MAX_PATCH_CHARS_PER_FILE - marker.length;
-    const headLength = Math.ceil(contentBudget / 2);
-    const tailLength = Math.floor(contentBudget / 2);
-    const omittedChars = patch.length - headLength - tailLength;
-    const exactMarker = buildPatchTruncationMarker(omittedChars);
-
-    if (exactMarker.length === marker.length) {
-      return `${patch.slice(0, headLength)}${exactMarker}${patch.slice(-tailLength)}`;
-    }
-
-    marker = exactMarker;
+  const chunks: string[] = [];
+  for (let offset = 0; offset < patch.length; offset += maxChars) {
+    chunks.push(patch.slice(offset, offset + maxChars));
   }
+  return chunks;
 }
 
-function buildPatchTruncationMarker(omittedChars: number): string {
-  return `${PATCH_TRUNCATION_MARKER_PREFIX}${omittedChars} characters from the middle of this patch to stay within the per-file scan limit]\n\n`;
+async function runFluePrScans(payload: PrScanPayload): Promise<PrScanResult> {
+  const findings: PrFinding[] = [];
+
+  for (const batch of buildPayloadBatches(payload)) {
+    const result = await runFluePrScan(batch);
+    if (result.error) return { error: result.error };
+    findings.push(...(result.findings ?? []));
+  }
+
+  return { findings };
+}
+
+function buildPayloadBatches(payload: PrScanPayload): PrScanPayload[] {
+  if (!payload.files.length) return [payload];
+
+  const fileBatches: PrScanPayload["files"][] = [];
+  let currentBatch: PrScanPayload["files"] = [];
+  let currentPatchChars = 0;
+
+  for (const file of payload.files) {
+    if (
+      currentBatch.length > 0
+      && currentPatchChars + file.patch.length > MAX_PAYLOAD_CHARS
+    ) {
+      fileBatches.push(currentBatch);
+      currentBatch = [];
+      currentPatchChars = 0;
+    }
+
+    currentBatch.push(file);
+    currentPatchChars += file.patch.length;
+  }
+
+  if (currentBatch.length > 0) fileBatches.push(currentBatch);
+
+  return fileBatches.map((files, index) => ({
+    ...payload,
+    scan: {
+      batch: index + 1,
+      batches: fileBatches.length,
+    },
+    files,
+  }));
 }
 
 async function runFluePrScan(payload: PrScanPayload): Promise<PrScanResult> {
   const baseUrl = process.env.FLUE_BASE_URL ?? "http://127.0.0.1:3583";
-  const agentId = encodeURIComponent(`${payload.owner}-${payload.repo}-${payload.prNumber}`);
+  const batchSuffix = payload.scan && payload.scan.batches > 1
+    ? `-batch-${payload.scan.batch}-of-${payload.scan.batches}`
+    : "";
+  const agentId = encodeURIComponent(`${payload.owner}-${payload.repo}-${payload.prNumber}${batchSuffix}`);
   const res = await fetch(`${baseUrl}/agents/pr-scan/${agentId}`, {
     method: "POST",
     headers: {
