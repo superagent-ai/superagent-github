@@ -5,6 +5,7 @@ const GITHUB_PR_FILES_PER_PAGE = 100;
 const GITHUB_PR_FILES_PAGE_LIMIT = 30;
 const MAX_PATCH_CHARS_PER_FILE = 8_000;
 const MAX_PAYLOAD_CHARS = 100_000;
+const PATCH_TRUNCATION_MARKER_PREFIX = "\n\n[Superagent truncated ";
 
 interface GitHubPrFile {
   filename: string;
@@ -152,18 +153,13 @@ async function fetchGitHub<T>(pathAndQuery: string, githubToken?: string): Promi
 function buildPayloadFiles(files: GitHubPrFile[]): PrScanPayload["files"] {
   let remaining = MAX_PAYLOAD_CHARS;
   return files.map((file) => {
-    const rawPatch = file.patch ?? "";
-    if (rawPatch.length > MAX_PATCH_CHARS_PER_FILE) {
-      throw new Error(
-        `PR patch for ${file.filename} exceeds the ${MAX_PATCH_CHARS_PER_FILE} character per-file scan limit`,
-      );
-    }
-    if (rawPatch.length > remaining) {
+    const patch = truncatePatch(file.patch ?? "");
+    if (patch.length > remaining) {
       throw new Error(
         `Total PR patch payload exceeds the ${MAX_PAYLOAD_CHARS} character scan limit before fully scanning ${file.filename}`,
       );
     }
-    remaining -= rawPatch.length;
+    remaining -= patch.length;
 
     return {
       path: file.filename,
@@ -172,9 +168,33 @@ function buildPayloadFiles(files: GitHubPrFile[]): PrScanPayload["files"] {
       additions: file.additions ?? 0,
       deletions: file.deletions ?? 0,
       changes: file.changes ?? 0,
-      patch: rawPatch,
+      patch,
     };
   });
+}
+
+function truncatePatch(patch: string): string {
+  if (patch.length <= MAX_PATCH_CHARS_PER_FILE) return patch;
+
+  let marker = buildPatchTruncationMarker(patch.length - MAX_PATCH_CHARS_PER_FILE);
+
+  while (true) {
+    const contentBudget = MAX_PATCH_CHARS_PER_FILE - marker.length;
+    const headLength = Math.ceil(contentBudget / 2);
+    const tailLength = Math.floor(contentBudget / 2);
+    const omittedChars = patch.length - headLength - tailLength;
+    const exactMarker = buildPatchTruncationMarker(omittedChars);
+
+    if (exactMarker.length === marker.length) {
+      return `${patch.slice(0, headLength)}${exactMarker}${patch.slice(-tailLength)}`;
+    }
+
+    marker = exactMarker;
+  }
+}
+
+function buildPatchTruncationMarker(omittedChars: number): string {
+  return `${PATCH_TRUNCATION_MARKER_PREFIX}${omittedChars} characters from the middle of this patch to stay within the per-file scan limit]\n\n`;
 }
 
 async function runFluePrScan(payload: PrScanPayload): Promise<PrScanResult> {

