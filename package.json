@@ -20,9 +20,9 @@
   "dependencies": {
     "@daytona/sdk": "^0.175.0",
     "@flue/sdk": "^0.5.3",
-    "@hono/node-server": "^1.19.12",
+    "@hono/node-server": "^1.19.14",
     "better-sqlite3": "^12.9.0",
-    "hono": "^4.12.10",
+    "hono": "^4.12.19",
     "octokit": "^5.0.5",
     "pino": "^10.3.1",
     "valibot": "^1.0.0",
@@ -35,5 +35,10 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "@opentelemetry/otlp-transformer": {
+      "protobufjs": "8.4.0"
+    }
   }
 }
