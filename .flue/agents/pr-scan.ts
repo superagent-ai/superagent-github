@@ -98,6 +98,7 @@ async function createDaytonaSandbox(env: unknown) {
   });
 
   return client.create({
+    ephemeral: true,
     autoStopInterval: 1,
     envVars: {
       NODE_ENV: "production",
