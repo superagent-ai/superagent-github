@@ -23,16 +23,9 @@ export async function isTrustedRepoContributor(
     authorAssociation?: string | null;
   },
 ): Promise<boolean> {
-  const { owner, repo, prNumber, login, authorAssociation } = params;
+  const { owner, repo, login, authorAssociation } = params;
 
   if (isTrustedAssociation(authorAssociation)) return true;
-
-  const { data: pr } = await octokit.rest.pulls.get({
-    owner,
-    repo,
-    pull_number: prNumber,
-  });
-  if (pr.user?.login === login) return true;
 
   try {
     const { data } = await octokit.rest.repos.getCollaboratorPermissionLevel({
@@ -40,7 +33,18 @@ export async function isTrustedRepoContributor(
       repo,
       username: login,
     });
-    return TRUSTED_PERMISSIONS.has(data.permission);
+    if (TRUSTED_PERMISSIONS.has(data.permission)) return true;
+  } catch {
+    // Public contributors are not always collaborators, so fall through.
+  }
+
+  try {
+    const contributors = await octokit.paginate(octokit.rest.repos.listContributors, {
+      owner,
+      repo,
+      per_page: 100,
+    });
+    return contributors.some((contributor) => contributor.login === login);
   } catch {
     return false;
   }
