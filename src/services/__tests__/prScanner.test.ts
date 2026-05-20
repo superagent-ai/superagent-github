@@ -5,6 +5,7 @@ vi.mock("../../lib/logger.js", () => ({
   childLogger: () => ({
     error: vi.fn(),
     info: vi.fn(),
+    warn: vi.fn(),
   }),
 }));
 
@@ -233,18 +234,68 @@ describe("scanPrLocally", () => {
   });
 
   it("returns an inconclusive error result when Flue fails", async () => {
+    vi.useFakeTimers();
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
         .mockResolvedValueOnce(jsonResponse({}))
         .mockResolvedValueOnce(jsonResponse([]))
-        .mockResolvedValueOnce(new Response("Flue agent failed", { status: 500 })),
+        .mockImplementation(() => new Response("Flue agent failed", { status: 500 })),
     );
 
-    const result = await scanPrLocally("acme", "repo", 12);
+    const scanPromise = scanPrLocally("acme", "repo", 12);
+    await vi.runAllTimersAsync();
+    const result = await scanPromise;
 
     expect(result).toEqual({ error: "Flue PR scan returned 500: Flue agent failed" });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(5);
+    expect(vi.mocked(fetch).mock.calls[2][0]).toBe(
+      "http://127.0.0.1:3583/agents/pr-scan/acme-repo-12",
+    );
+    expect(vi.mocked(fetch).mock.calls[3][0]).toBe(
+      "http://127.0.0.1:3583/agents/pr-scan/acme-repo-12-retry-2",
+    );
+    expect(vi.mocked(fetch).mock.calls[4][0]).toBe(
+      "http://127.0.0.1:3583/agents/pr-scan/acme-repo-12-retry-3",
+    );
+    vi.useRealTimers();
+  });
+
+  it("retries transient Flue 500 errors before succeeding", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ title: "Update build", body: "", user: { login: "octocat" } }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(new Response("temporary outage", { status: 500 }))
+      .mockResolvedValueOnce(jsonResponse({
+        findings: [
+          {
+            category: "malicious_intent",
+            severity: "medium",
+            title: "Suspicious change",
+            file: "package.json",
+            evidence: "Unexpected network call.",
+            recommendation: "Review the change.",
+          },
+        ],
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const scanPromise = scanPrLocally("acme", "repo", 12);
+    await vi.runAllTimersAsync();
+    const result = await scanPromise;
+
+    expect(result.findings?.[0]?.title).toBe("Suspicious change");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      "http://127.0.0.1:3583/agents/pr-scan/acme-repo-12",
+    );
+    expect(fetchMock.mock.calls[3][0]).toBe(
+      "http://127.0.0.1:3583/agents/pr-scan/acme-repo-12-retry-2",
+    );
+    vi.useRealTimers();
   });
 });
 

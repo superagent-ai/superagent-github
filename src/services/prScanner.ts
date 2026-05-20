@@ -5,6 +5,9 @@ const GITHUB_PR_FILES_PER_PAGE = 100;
 const GITHUB_PR_FILES_PAGE_LIMIT = 30;
 const MAX_PATCH_CHARS_PER_FILE = 8_000;
 const MAX_PAYLOAD_CHARS = 100_000;
+const FLUE_PR_SCAN_MAX_ATTEMPTS = 3;
+const FLUE_PR_SCAN_RETRY_BASE_MS = 2_000;
+const RETRYABLE_FLUE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 interface GitHubPrFile {
   filename: string;
@@ -185,9 +188,15 @@ function splitPatch(patch: string, maxChars: number): string[] {
 
 async function runFluePrScans(payload: PrScanPayload): Promise<PrScanResult> {
   const findings: PrFinding[] = [];
+  const log = childLogger({
+    service: "pr-scanner",
+    owner: payload.owner,
+    repo: payload.repo,
+    pr: payload.prNumber,
+  });
 
   for (const batch of buildPayloadBatches(payload)) {
-    const result = await runFluePrScan(batch);
+    const result = await runFluePrScanWithRetry(batch, log);
     if (result.error) return { error: result.error };
     findings.push(...(result.findings ?? []));
   }
@@ -228,12 +237,45 @@ function buildPayloadBatches(payload: PrScanPayload): PrScanPayload[] {
   }));
 }
 
-async function runFluePrScan(payload: PrScanPayload): Promise<PrScanResult> {
+async function runFluePrScanWithRetry(
+  payload: PrScanPayload,
+  log: ReturnType<typeof childLogger>,
+): Promise<PrScanResult> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= FLUE_PR_SCAN_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await requestFluePrScan(payload, attempt);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error("Flue PR scan failed");
+      if (!isRetryableFlueError(err) || attempt === FLUE_PR_SCAN_MAX_ATTEMPTS) {
+        throw lastError;
+      }
+
+      const delayMs = FLUE_PR_SCAN_RETRY_BASE_MS * 2 ** (attempt - 1);
+      log.warn(
+        { attempt, delayMs, err: lastError.message },
+        "Flue PR scan failed with retryable error; retrying",
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError ?? new Error("Flue PR scan failed");
+}
+
+async function requestFluePrScan(
+  payload: PrScanPayload,
+  attempt = 1,
+): Promise<PrScanResult> {
   const baseUrl = process.env.FLUE_BASE_URL ?? "http://127.0.0.1:3583";
   const batchSuffix = payload.scan && payload.scan.batches > 1
     ? `-batch-${payload.scan.batch}-of-${payload.scan.batches}`
     : "";
-  const agentId = encodeURIComponent(`${payload.owner}-${payload.repo}-${payload.prNumber}${batchSuffix}`);
+  const retrySuffix = attempt > 1 ? `-retry-${attempt}` : "";
+  const agentId = encodeURIComponent(
+    `${payload.owner}-${payload.repo}-${payload.prNumber}${batchSuffix}${retrySuffix}`,
+  );
   const res = await fetch(`${baseUrl}/agents/pr-scan/${agentId}`, {
     method: "POST",
     headers: {
@@ -245,11 +287,43 @@ async function runFluePrScan(payload: PrScanPayload): Promise<PrScanResult> {
   });
 
   if (!res.ok) {
-    throw new Error(`Flue PR scan returned ${res.status}: ${await res.text()}`);
+    throw new FluePrScanHttpError(
+      `Flue PR scan returned ${res.status}: ${await res.text()}`,
+      res.status,
+    );
   }
 
   const data = await res.json();
   return normalizePrScanResult(unwrapFlueResult(data));
+}
+
+class FluePrScanHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "FluePrScanHttpError";
+  }
+}
+
+function isRetryableFlueError(err: unknown): boolean {
+  if (err instanceof FluePrScanHttpError) {
+    return RETRYABLE_FLUE_STATUSES.has(err.status);
+  }
+
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AbortError" || err.name === "TimeoutError") return true;
+
+  const code = (err as NodeJS.ErrnoException).code;
+  return code === "ECONNRESET"
+    || code === "ECONNREFUSED"
+    || code === "EPIPE"
+    || code === "ETIMEDOUT";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizePrScanResult(result: PrScanResult): PrScanResult {
