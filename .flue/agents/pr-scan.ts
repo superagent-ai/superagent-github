@@ -63,29 +63,34 @@ type PrScanPayload = {
 };
 
 export default async function ({ init, payload, env }: FlueContext) {
-  const envSource = toEnvSource(env);
-  const sandbox = await createDaytonaSandbox(env);
-  const workspacePath = await getWorkspacePath(sandbox);
-  await seedCiCdSkill(sandbox, workspacePath);
+  try {
+    const envSource = toEnvSource(env);
+    const sandbox = await createDaytonaSandbox(env);
+    const workspacePath = await getWorkspacePath(sandbox);
+    await seedCiCdSkill(sandbox, workspacePath);
 
-  const harness = await init({
-    sandbox: daytona(sandbox),
-    cwd: workspacePath,
-    model: getAzureKimiModel(envSource),
-  });
-  const session = await harness.session();
-  const pr = normalizePayload(payload);
-  const workflowFiles = pr.files.filter((file) => file.path.startsWith(".github/workflows/"));
+    const harness = await init({
+      sandbox: daytona(sandbox),
+      cwd: workspacePath,
+      model: getAzureKimiModel(envSource),
+    });
+    const session = await harness.session();
+    const pr = normalizePayload(payload);
+    const workflowFiles = pr.files.filter((file) => file.path.startsWith(".github/workflows/"));
 
-  const ciCdFindings = workflowFiles.length
-    ? await scanCiCdWorkflows(session, workflowFiles)
-    : [];
+    const ciCdFindings = workflowFiles.length
+      ? await scanCiCdWorkflows(session, workflowFiles)
+      : [];
 
-  const { data } = await session.prompt(buildPrScanPrompt(pr, ciCdFindings), {
-    schema: prScanResultSchema,
-  });
+    const { data } = await session.prompt(buildPrScanPrompt(pr, ciCdFindings), {
+      schema: prScanResultSchema,
+    });
 
-  return data;
+    return data;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "PR scan agent failed";
+    throw new Error(`PR scan agent failed: ${message}`, { cause: err });
+  }
 }
 
 async function createDaytonaSandbox(env: unknown) {
@@ -119,8 +124,13 @@ async function seedCiCdSkill(
     `mkdir -p ${shellQuote(`${workspacePath}/.agents/skills/ci-cd-security/references`)}`,
   );
 
+  const skillRoot = path.resolve(
+    process.cwd(),
+    ".agents/skills/ci-cd-security",
+  );
+
   for (const relativePath of SKILL_FILES) {
-    const sourcePath = path.resolve(".agents/skills/ci-cd-security", relativePath);
+    const sourcePath = path.join(skillRoot, relativePath);
     const targetPath = `${workspacePath}/.agents/skills/ci-cd-security/${relativePath}`;
     const content = await readFile(sourcePath);
     await sandbox.fs.uploadFile(Buffer.from(content), targetPath);
