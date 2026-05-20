@@ -31,6 +31,7 @@ Superagent then updates the PR with:
 | ------------------------------------------- | --------------- | -------------------------------------- | ---------------------- | ------------ |
 | PR has no findings / contributor score >= 30 | success         | `pr:verified` / `contributor:verified` | removed                | no           |
 | PR has security concerns                    | action required | `pr:flagged`                           | inline review comments | yes          |
+| All findings dismissed in thread replies    | success         | `pr:verified`                          | acknowledgment reply   | no           |
 | Contributor score < 30                      | failure         | `contributor:flagged`                  | posted                 | yes          |
 | PR scan inconclusive                        | neutral         | --                                     | --                     | no           |
 
@@ -48,9 +49,11 @@ Create a new GitHub App at `https://github.com/settings/apps/new` with these set
 - Contents: Read (for repository config)
 - Metadata: Read
 
-**Webhook events:**
+**Webhook events** (enable every item under the app's **Subscribe to events** - registering handlers in this repo does not subscribe the app):
 
 - Pull request
+- Pull request review comment
+- **Pull request review thread** (required for **Resolve conversation** to dismiss findings)
 - Check run
 - Check suite
 - Installation
@@ -139,6 +142,12 @@ src/
     ├── contributorScoring.ts   # Contributor scoring formulas
     └── policy.ts               # Check-result evaluation logic
 ```
+
+## Dismissing findings
+
+When Superagent flags a finding on an inline review comment, reply in that thread with context (for example, that the behavior is intentional). Superagent evaluates the reply and, when it adequately explains the concern, posts a short acknowledgment and clears the **Security scan** check once every open finding on the PR has been addressed.
+
+Re-scanning the PR (a new push or re-run) replaces findings and clears prior dismissals for that pull request.
 
 ## Re-running checks
 

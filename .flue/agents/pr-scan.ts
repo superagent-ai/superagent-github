@@ -171,9 +171,9 @@ Scan exactly these areas:
 3. General PR changes that indicate malicious intent. Look for secret exfiltration, obfuscation, encoded payloads, unexpected network calls, dependency confusion, typosquatting, privilege escalation, credential handling changes, telemetry that leaks sensitive data, suspicious binary/blob additions, dangerous eval/exec patterns, and changes that hide behavior from reviewers.
 
 Every finding must be actionable:
-- title: concise issue name
+- title: one clear sentence describing the issue (shown after the priority label, e.g. "**P2:** ...")
 - category: "ci_cd", "lifecycle", or "malicious_intent"
-- severity: "critical", "high", "medium", or "low"
+- severity: "critical" (P0), "high" (P1), "medium" (P2), or "low" (P3)
 - file and line when available
 - evidence: quote or describe the concrete changed code/pattern
 - recommendation: exact remediation or review action
