@@ -1,11 +1,14 @@
 import type { Octokit } from "octokit";
 import type { PrFinding, RepoConfig } from "../lib/types.js";
+import { formatFindingPriority } from "../lib/findingPriority.js";
 import { CHECK_NAMES, MARKERS, LABEL_DEFS } from "../lib/types.js";
 import { evaluatePrScan } from "../lib/policy.js";
 import { createInProgressCheck, completeCheck } from "./checkRuns.js";
 import { deleteMarkerComment } from "./comments.js";
 import { getGitHubToken } from "./githubToken.js";
 import { scanPrLocally } from "./prScanner.js";
+import { clearPrFindingDismissals } from "./prFindingDismissals.js";
+import { scheduleDismissalReconcile } from "./findingDismissal.js";
 import { clearLabels, ensureLabels, setLabel } from "./labels.js";
 import { childLogger } from "../lib/logger.js";
 
@@ -67,6 +70,7 @@ export async function runPrScan(
         headSha,
         result.findings ?? [],
       );
+      scheduleDismissalReconcile(octokit, { owner, repo, prNumber, headSha });
       break;
     }
 
@@ -100,7 +104,7 @@ function renderFindingsSummary(findings: PrFinding[]): string {
       const location = finding.file
         ? ` (${finding.file}${finding.line ? `:${finding.line}` : ""})`
         : "";
-      return `${index + 1}. [${finding.severity.toUpperCase()}] ${finding.title}${location}\n${finding.recommendation}`;
+      return `${index + 1}. **${formatFindingPriority(finding.severity)}:** ${finding.title}${location}\n${finding.recommendation}`;
     })
     .join("\n\n");
 }
@@ -113,6 +117,7 @@ async function replaceInlineFindingComments(
   headSha: string,
   findings: PrFinding[],
 ): Promise<void> {
+  clearPrFindingDismissals(owner, repo, prNumber);
   await deleteInlineFindingComments(octokit, owner, repo, prNumber);
 
   const comments = findings
@@ -169,11 +174,11 @@ function renderInlineFindingComment(finding: PrFinding): string {
   );
 
   return `${MARKERS.PR_FINDING}
-**[${finding.severity.toUpperCase()}] ${finding.title}**
+**${formatFindingPriority(finding.severity)}:** ${finding.title}
 
 ${evidence}
 
-Fix: ${recommendation}`;
+${recommendation}`;
 }
 
 function compactSentence(value: string, maxLength: number): string {

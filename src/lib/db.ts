@@ -40,6 +40,17 @@ db.exec(`
     result_json TEXT NOT NULL,
     scanned_at  TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS pr_finding_dismissals (
+    owner              TEXT NOT NULL,
+    repo               TEXT NOT NULL,
+    pr_number          INTEGER NOT NULL,
+    review_comment_id  INTEGER NOT NULL,
+    dismissed_by       TEXT NOT NULL,
+    head_sha           TEXT NOT NULL,
+    dismissed_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (owner, repo, pr_number, review_comment_id)
+  );
 `);
 
 logger.info({ path: env.dbPath }, "Database initialized");
@@ -117,6 +128,34 @@ export const queries: Record<string, Statement> = {
     ON CONFLICT(login) DO UPDATE SET
       result_json = @resultJson,
       scanned_at  = @scannedAt
+  `),
+
+  dismissPrFinding: db.prepare(`
+    INSERT INTO pr_finding_dismissals (
+      owner, repo, pr_number, review_comment_id, dismissed_by, head_sha
+    )
+    VALUES (
+      @owner, @repo, @prNumber, @reviewCommentId, @dismissedBy, @headSha
+    )
+    ON CONFLICT(owner, repo, pr_number, review_comment_id) DO UPDATE SET
+      dismissed_by = @dismissedBy,
+      head_sha     = @headSha,
+      dismissed_at = datetime('now')
+  `),
+
+  isPrFindingDismissed: db.prepare(`
+    SELECT 1
+    FROM pr_finding_dismissals
+    WHERE owner = @owner
+      AND repo = @repo
+      AND pr_number = @prNumber
+      AND review_comment_id = @reviewCommentId
+    LIMIT 1
+  `),
+
+  clearPrFindingDismissals: db.prepare(`
+    DELETE FROM pr_finding_dismissals
+    WHERE owner = @owner AND repo = @repo AND pr_number = @prNumber
   `),
 };
 

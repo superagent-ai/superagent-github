@@ -1,3 +1,6 @@
+import os from "node:os";
+import path from "node:path";
+
 function required(key: string): string {
   const value = process.env[key];
   if (!value) throw new Error(`Missing required environment variable: ${key}`);
@@ -27,6 +30,10 @@ export const env = {
     return process.env.LOG_LEVEL ?? "info";
   },
   get dbPath() {
-    return process.env.DB_PATH ?? "/data/brin.db";
+    if (process.env.DB_PATH) return process.env.DB_PATH;
+    if (process.env.NODE_ENV === "test") {
+      return path.join(os.tmpdir(), "brin-github-test.db");
+    }
+    return "/data/brin.db";
   },
 } as const;

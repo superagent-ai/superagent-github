@@ -1,5 +1,6 @@
 import type { Octokit } from "octokit";
 import type { PrScanResult, ContributorResult, PrStatus } from "../lib/types.js";
+import { formatFindingPriority } from "../lib/findingPriority.js";
 import { MARKERS } from "../lib/types.js";
 
 export async function upsertComment(
@@ -68,7 +69,7 @@ export function renderPrScanComment(
   body += `This PR has suspicious changes that should be reviewed before merge.\n\n`;
 
   for (const finding of findings) {
-    body += `#### [${finding.severity.toUpperCase()}] ${finding.title}\n\n`;
+    body += `**${formatFindingPriority(finding.severity)}:** ${finding.title}\n\n`;
     body += `- **Category:** ${formatFindingCategory(finding.category)}\n`;
     if (finding.file) {
       body += `- **Location:** \`${finding.file}`;

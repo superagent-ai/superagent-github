@@ -6,6 +6,7 @@ export const CHECK_NAMES = {
 export const MARKERS = {
   PR_SCAN: "<!-- brin-pr-scan -->",
   PR_FINDING: "<!-- brin-pr-finding -->",
+  PR_FINDING_ACK: "<!-- brin-pr-finding-ack -->",
   CONTRIBUTOR_TRUST: "<!-- brin-check -->",
 } as const;
 

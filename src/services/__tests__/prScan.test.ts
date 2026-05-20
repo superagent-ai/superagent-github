@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CHECK_NAMES, DEFAULT_CONFIG } from "../../lib/types.js";
 import { runPrScan } from "../prScan.js";
 
+vi.mock("../prFindingDismissals.js", () => ({
+  clearPrFindingDismissals: vi.fn(),
+}));
+
 vi.mock("../../lib/logger.js", () => ({
   childLogger: () => ({
     error: vi.fn(),
@@ -82,8 +86,9 @@ describe("runPrScan", () => {
     );
     const body = octokit.rest.pulls.createReview.mock.calls[0][0].comments[0].body;
     expect(body).toContain("A new postinstall hook executes a remote script.");
-    expect(body).toContain("Fix: Remove the lifecycle hook");
-    expect(body).toContain("[HIGH] Suspicious lifecycle hook");
+    expect(body).toContain("Remove the lifecycle hook");
+    expect(body).toContain("**P1:** Suspicious lifecycle hook");
+    expect(body).not.toContain("Fix:");
     expect(body).not.toContain("Recommended fix");
   });
 

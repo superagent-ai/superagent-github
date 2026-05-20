@@ -33,11 +33,11 @@ describe("renderPrScanComment", () => {
     expect(body).toContain("suspicious changes");
     expect(body).not.toContain("Score");
     expect(body).not.toContain("Verdict");
-    expect(body).toContain("[CRITICAL] pull_request_target checks out fork code");
+    expect(body).toContain("**P0:** pull_request_target checks out fork code");
     expect(body).toContain("**Category:** CI/CD");
     expect(body).toContain("`.github/workflows/ci.yml:12`");
     expect(body).toContain("Use pull_request for untrusted code");
-    expect(body).toContain("[HIGH] Encoded payload added to build script");
+    expect(body).toContain("**P1:** Encoded payload added to build script");
     expect(body).toContain("Analyzed by [Superagent]");
   });
 
@@ -45,7 +45,7 @@ describe("renderPrScanComment", () => {
     const result: PrScanResult = { findings: [] };
     const body = renderPrScanComment("review", result);
 
-    expect(body).not.toContain("#### [");
+    expect(body).not.toContain("#### ");
   });
 });
 
