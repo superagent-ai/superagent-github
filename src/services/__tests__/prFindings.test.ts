@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MARKERS } from "../../lib/types.js";
 import {
   isPrFindingComment,
+  listAcknowledgedFindingCommentIds,
   resolveFindingForUserReply,
   resolveRootFindingComment,
 } from "../prFindings.js";
@@ -45,6 +46,33 @@ describe("resolveRootFindingComment", () => {
     });
 
     expect(root?.id).toBe(10);
+  });
+});
+
+describe("listAcknowledgedFindingCommentIds", () => {
+  it("only trusts bot-authored acknowledgment markers", async () => {
+    const listReviewComments = vi.fn();
+    const octokit = {
+      paginate: vi.fn().mockResolvedValue([
+        {
+          id: 11,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 10,
+          user: { login: "malicious-user", type: "User" },
+        },
+        {
+          id: 12,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 20,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
+      ]),
+      rest: { pulls: { listReviewComments } },
+    } as any;
+
+    const ids = await listAcknowledgedFindingCommentIds(octokit, "acme", "repo", 12);
+
+    expect([...ids]).toEqual([20]);
   });
 });
 

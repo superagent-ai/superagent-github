@@ -453,7 +453,7 @@ export async function persistReviewedFindingDismissals(
       reviewCommentId: finding.id,
       findingFingerprint: fingerprintPrFindingCommentBody(finding.body),
       dismissedBy: "reviewed-thread",
-      headSha,
+      headSha: finding.commit_id ?? headSha,
     });
   }
 

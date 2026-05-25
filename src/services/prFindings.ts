@@ -6,6 +6,7 @@ export interface PrReviewComment {
   id: number;
   body: string | null;
   in_reply_to_id?: number | null;
+  commit_id?: string | null;
   path?: string;
   line?: number | null;
   user?: { login?: string; type?: string } | null;
@@ -76,10 +77,15 @@ export async function listAcknowledgedFindingCommentIds(
   const ids = new Set<number>();
   for (const comment of comments) {
     if (!comment.body?.includes(MARKERS.PR_FINDING_ACK)) continue;
+    if (!isBotUser(comment.user)) continue;
     if (comment.in_reply_to_id != null) ids.add(comment.in_reply_to_id);
   }
 
   return ids;
+}
+
+function isBotUser(user: PrReviewComment["user"]): boolean {
+  return user?.type === "Bot" || !!user?.login?.endsWith("[bot]");
 }
 
 export async function getReviewComment(
