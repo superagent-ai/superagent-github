@@ -73,6 +73,7 @@ describe("handleFindingReply", () => {
           body: `${MARKERS.PR_FINDING}\n**P2:** Sandbox scopes`,
           path: "pkg.ts",
           line: 1,
+          commit_id: "finding-sha",
           user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ],
@@ -114,6 +115,12 @@ describe("handleFindingReply", () => {
     expect(octokit.rest.issues.setLabels).toHaveBeenCalledWith(
       expect.objectContaining({
         labels: expect.arrayContaining([LABEL_DEFS.PR_VERIFIED.name]),
+      }),
+    );
+    expect(dismissPrFindingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewCommentId: 10,
+        headSha: "finding-sha",
       }),
     );
   });

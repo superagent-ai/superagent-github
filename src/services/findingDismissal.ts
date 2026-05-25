@@ -98,6 +98,7 @@ export async function handleFindingReply(
       prNumber,
       rootFindingId: rootFinding.id,
       rootFindingBody: rootFinding.body,
+      rootFindingCommitId: rootFinding.commit_id,
       replyToCommentId: comment.id,
       dismissedBy: login || "unknown",
       acknowledgment: "Got it, thanks for the context.",
@@ -113,6 +114,7 @@ export async function handleFindingReply(
       prNumber,
       rootFindingId: rootFinding.id,
       rootFindingBody: rootFinding.body,
+      rootFindingCommitId: rootFinding.commit_id,
       replyToCommentId: comment.id,
       dismissedBy: login || "unknown",
       acknowledgment: evaluation.acknowledgment,
@@ -231,6 +233,7 @@ async function dismissFinding(
     prNumber: number;
     rootFindingId: number;
     rootFindingBody: string | null;
+    rootFindingCommitId?: string | null;
     replyToCommentId: number;
     dismissedBy: string;
     acknowledgment: string;
@@ -242,6 +245,7 @@ async function dismissFinding(
     prNumber,
     rootFindingId,
     rootFindingBody,
+    rootFindingCommitId,
     replyToCommentId,
     dismissedBy,
     acknowledgment,
@@ -260,7 +264,7 @@ async function dismissFinding(
     reviewCommentId: rootFindingId,
     findingFingerprint: fingerprintPrFindingCommentBody(rootFindingBody),
     dismissedBy,
-    headSha: pr.head.sha,
+    headSha: rootFindingCommitId ?? pr.head.sha,
   });
 
   await postFindingReply(octokit, {
