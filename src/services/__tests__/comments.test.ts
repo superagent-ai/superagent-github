@@ -55,7 +55,6 @@ describe("renderContributorTrustComment", () => {
       score: 25,
       verdict: "suspicious",
       name: "sketchy-user",
-      url: "https://superagent.sh/contributor/sketchy-user",
       threats: [
         { type: "new_account", severity: "high", detail: "Account created less than 30 days ago" },
       ],
@@ -80,7 +79,7 @@ describe("renderContributorTrustComment", () => {
     expect(body).toContain("| Behavior | 30 |");
     expect(body).toContain("| Content | 40 |");
     expect(body).not.toContain("| Graph |");
-    expect(body).toContain("[Full profile](https://superagent.sh/contributor/sketchy-user?details=true)");
+    expect(body).toContain("Analyzed by [Superagent]");
   });
 
   it("renders without threats section when empty", () => {
@@ -105,18 +104,6 @@ describe("renderContributorTrustComment", () => {
 
     expect(body).toContain("| Identity | \u2014 |");
     expect(body).not.toContain("| Graph |");
-  });
-
-  it("omits full profile link when url is missing", () => {
-    const result: ContributorResult = {
-      score: 40,
-      verdict: "caution",
-      name: "some-user",
-    };
-    const body = renderContributorTrustComment(result);
-
-    expect(body).not.toContain("Full profile");
-    expect(body).toContain("Analyzed by [Superagent]");
   });
 
   it("uses correct emoji for each verdict", () => {

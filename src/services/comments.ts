@@ -1,7 +1,7 @@
 import type { Octokit } from "octokit";
 import type { PrScanResult, ContributorResult, PrStatus } from "../lib/types.js";
 import { formatFindingPriority } from "../lib/findingPriority.js";
-import { MARKERS } from "../lib/types.js";
+import { MARKERS, SUPERAGENT_URL } from "../lib/types.js";
 
 export async function upsertComment(
   octokit: Octokit,
@@ -80,7 +80,7 @@ export function renderPrScanComment(
     body += `- **Recommended fix:** ${finding.recommendation}\n\n`;
   }
 
-  body += `<sub>Analyzed by [Superagent](https://superagent.sh)</sub>`;
+  body += `<sub>Analyzed by [Superagent](${SUPERAGENT_URL})</sub>`;
   return body;
 }
 
@@ -127,11 +127,7 @@ export function renderContributorTrustComment(
   body += `\n`;
   body += `</details>\n\n`;
 
-  body += `<sub>Analyzed by [Superagent](https://superagent.sh)`;
-  if (result.url) {
-    body += ` \u00b7 [Full profile](${result.url}?details=true)`;
-  }
-  body += `</sub>`;
+  body += `<sub>Analyzed by [Superagent](${SUPERAGENT_URL})</sub>`;
 
   return body;
 }
