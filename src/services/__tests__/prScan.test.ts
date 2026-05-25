@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CHECK_NAMES, DEFAULT_CONFIG } from "../../lib/types.js";
 import { runPrScan } from "../prScan.js";
 
+const isPrFindingFingerprintDismissedMock = vi.hoisted(() => vi.fn());
+
 vi.mock("../prFindingDismissals.js", () => ({
   clearPrFindingDismissals: vi.fn(),
+  isPrFindingFingerprintDismissed: isPrFindingFingerprintDismissedMock,
 }));
 
 vi.mock("../../lib/logger.js", () => ({
@@ -18,6 +21,7 @@ describe("runPrScan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    isPrFindingFingerprintDismissedMock.mockReturnValue(false);
   });
 
   it("comments and flags the PR when local scanner returns findings", async () => {
@@ -90,6 +94,50 @@ describe("runPrScan", () => {
     expect(body).toContain("**P1:** Suspicious lifecycle hook");
     expect(body).not.toContain("Fix:");
     expect(body).not.toContain("Recommended fix");
+  });
+
+  it("does not recreate comments for previously dismissed findings", async () => {
+    isPrFindingFingerprintDismissedMock.mockReturnValue(true);
+    stubScanFetch({
+      findings: [
+        {
+          category: "malicious_intent",
+          severity: "high",
+          title: "Suspicious lifecycle hook",
+          file: "package.json",
+          line: 1,
+          evidence: "postinstall executes a remote script.",
+          recommendation: "Remove the hook and vendor reviewed setup code.",
+          short_evidence: "A new postinstall hook executes a remote script.",
+          short_recommendation: "Remove the lifecycle hook or replace it with reviewed local setup code.",
+        },
+      ],
+    });
+    const octokit = mockOctokit();
+
+    await runPrScan(octokit, {
+      owner: "acme",
+      repo: "repo",
+      prNumber: 12,
+      headSha: "abc123",
+      config: DEFAULT_CONFIG,
+    });
+
+    expect(octokit.rest.checks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conclusion: "success",
+        output: expect.objectContaining({
+          summary: "All detected findings were previously reviewed and dismissed.",
+        }),
+      }),
+    );
+    expect(octokit.rest.issues.setLabels).toHaveBeenCalledWith(
+      expect.objectContaining({ labels: ["keep", "pr:verified"] }),
+    );
+    expect(octokit.rest.pulls.createReview).not.toHaveBeenCalled();
+    expect(octokit.rest.pulls.deleteReviewComment).toHaveBeenCalledWith(
+      expect.objectContaining({ comment_id: 100 }),
+    );
   });
 
   it("verifies the PR and removes stale comments when no findings are found", async () => {

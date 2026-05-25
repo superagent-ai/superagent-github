@@ -5,10 +5,14 @@ export function dismissPrFinding(params: {
   repo: string;
   prNumber: number;
   reviewCommentId: number;
+  findingFingerprint?: string | null;
   dismissedBy: string;
   headSha: string;
 }): void {
-  queries.dismissPrFinding.run(params);
+  queries.dismissPrFinding.run({
+    ...params,
+    findingFingerprint: params.findingFingerprint ?? null,
+  });
 }
 
 export function isPrFindingDismissed(
@@ -22,6 +26,20 @@ export function isPrFindingDismissed(
     repo,
     prNumber,
     reviewCommentId,
+  });
+}
+
+export function isPrFindingFingerprintDismissed(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  findingFingerprint: string,
+): boolean {
+  return !!queries.isPrFindingFingerprintDismissed.get({
+    owner,
+    repo,
+    prNumber,
+    findingFingerprint,
   });
 }
 

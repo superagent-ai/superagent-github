@@ -1,4 +1,5 @@
 import type { Octokit } from "octokit";
+import { createHash } from "node:crypto";
 import { MARKERS } from "../lib/types.js";
 
 export interface PrReviewComment {
@@ -13,6 +14,32 @@ export interface PrReviewComment {
 
 export function isPrFindingComment(body: string | null | undefined): boolean {
   return !!body?.includes(MARKERS.PR_FINDING) && !body.includes(MARKERS.PR_FINDING_ACK);
+}
+
+const FINGERPRINT_MARKER_RE =
+  /<!--\s*superagent-finding-fingerprint:([a-f0-9]+)\s*-->/i;
+
+export function fingerprintPrFindingCommentBody(
+  body: string | null | undefined,
+): string | undefined {
+  if (!body) return undefined;
+
+  const existing = body.match(FINGERPRINT_MARKER_RE)?.[1];
+  if (existing) return existing;
+
+  const normalized = body
+    .replace(FINGERPRINT_MARKER_RE, "")
+    .replace(MARKERS.PR_FINDING, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return undefined;
+
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+export function appendPrFindingFingerprint(body: string, fingerprint: string): string {
+  return `${body}\n\n<!-- superagent-finding-fingerprint:${fingerprint} -->`;
 }
 
 export async function listPrFindingComments(

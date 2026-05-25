@@ -6,6 +6,7 @@ import { completeCheck } from "./checkRuns.js";
 import { loadConfig } from "./config.js";
 import {
   getReviewThreadIdForComment,
+  fingerprintPrFindingCommentBody,
   listPrFindingComments,
   listResolvedFindingCommentIds,
   resolveFindingForUserReply,
@@ -95,6 +96,7 @@ export async function handleFindingReply(
       repo,
       prNumber,
       rootFindingId: rootFinding.id,
+      rootFindingBody: rootFinding.body,
       replyToCommentId: comment.id,
       dismissedBy: login || "unknown",
       acknowledgment: "Got it, thanks for the context.",
@@ -109,6 +111,7 @@ export async function handleFindingReply(
       repo,
       prNumber,
       rootFindingId: rootFinding.id,
+      rootFindingBody: rootFinding.body,
       replyToCommentId: comment.id,
       dismissedBy: login || "unknown",
       acknowledgment: evaluation.acknowledgment,
@@ -202,6 +205,7 @@ export async function handleFindingThreadResolved(
     repo,
     prNumber,
     reviewCommentId: rootFinding.id,
+    findingFingerprint: fingerprintPrFindingCommentBody(rootFinding.body),
     dismissedBy: login || "unknown",
     headSha: pr.head.sha,
   });
@@ -225,13 +229,22 @@ async function dismissFinding(
     repo: string;
     prNumber: number;
     rootFindingId: number;
+    rootFindingBody: string | null;
     replyToCommentId: number;
     dismissedBy: string;
     acknowledgment: string;
   },
 ): Promise<void> {
-  const { owner, repo, prNumber, rootFindingId, replyToCommentId, dismissedBy, acknowledgment } =
-    params;
+  const {
+    owner,
+    repo,
+    prNumber,
+    rootFindingId,
+    rootFindingBody,
+    replyToCommentId,
+    dismissedBy,
+    acknowledgment,
+  } = params;
 
   const { data: pr } = await octokit.rest.pulls.get({
     owner,
@@ -244,6 +257,7 @@ async function dismissFinding(
     repo,
     prNumber,
     reviewCommentId: rootFindingId,
+    findingFingerprint: fingerprintPrFindingCommentBody(rootFindingBody),
     dismissedBy,
     headSha: pr.head.sha,
   });
@@ -349,6 +363,34 @@ export async function reconcilePrScanAfterDismissals(
   } catch (err) {
     log.warn({ err }, "Failed to load resolved review threads");
   }
+
+  if (findings.length === 0) return;
+
+  const headSha =
+    resolvedFindingIds.size > 0
+      ? params.headSha ??
+        (
+          await octokit.rest.pulls.get({
+            owner,
+            repo,
+            pull_number: prNumber,
+          })
+        ).data.head.sha
+      : undefined;
+
+  for (const finding of findings) {
+    if (!resolvedFindingIds.has(finding.id)) continue;
+    dismissPrFinding({
+      owner,
+      repo,
+      prNumber,
+      reviewCommentId: finding.id,
+      findingFingerprint: fingerprintPrFindingCommentBody(finding.body),
+      dismissedBy: "resolved-thread",
+      headSha: headSha!,
+    });
+  }
+
   const openFindings = findings.filter(
     (finding) =>
       !isPrFindingDismissed(owner, repo, prNumber, finding.id) &&
@@ -367,9 +409,8 @@ export async function reconcilePrScanAfterDismissals(
     return;
   }
 
-  if (findings.length === 0) return;
-
-  const headSha =
+  const currentHeadSha =
+    headSha ??
     params.headSha ??
     (
       await octokit.rest.pulls.get({
@@ -382,12 +423,12 @@ export async function reconcilePrScanAfterDismissals(
   const { data: checkRuns } = await octokit.rest.checks.listForRef({
     owner,
     repo,
-    ref: headSha,
+    ref: currentHeadSha,
     check_name: CHECK_NAMES.PR_SCAN,
   });
   const checkRun = checkRuns.check_runs.find((run) => run.name === CHECK_NAMES.PR_SCAN);
   if (!checkRun) {
-    log.warn({ headSha }, "No PR scan check run found to update");
+    log.warn({ headSha: currentHeadSha }, "No PR scan check run found to update");
     return;
   }
 
