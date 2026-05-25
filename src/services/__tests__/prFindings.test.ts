@@ -71,6 +71,12 @@ describe("listAcknowledgedFindingCommentIds", () => {
           id: 13,
           body: MARKERS.PR_FINDING_ACK,
           in_reply_to_id: 30,
+          user: { login: "superagent-security-dev[bot]", type: "Bot" },
+        },
+        {
+          id: 14,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 40,
           user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ]),
@@ -79,7 +85,7 @@ describe("listAcknowledgedFindingCommentIds", () => {
 
     const ids = await listAcknowledgedFindingCommentIds(octokit, "acme", "repo", 12);
 
-    expect([...ids]).toEqual([30]);
+    expect([...ids]).toEqual([30, 40]);
   });
 });
 

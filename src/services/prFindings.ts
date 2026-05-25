@@ -2,7 +2,12 @@ import type { Octokit } from "octokit";
 import { createHash } from "node:crypto";
 import { MARKERS } from "../lib/types.js";
 
-const SUPERAGENT_BOT_LOGIN = "superagent-security[bot]";
+const SUPERAGENT_BOT_LOGINS = new Set([
+  "superagent-security",
+  "superagent-security[bot]",
+  "superagent-security-dev",
+  "superagent-security-dev[bot]",
+]);
 
 export interface PrReviewComment {
   id: number;
@@ -98,7 +103,7 @@ function isSuperagentBot(user: PrReviewComment["user"]): boolean {
 }
 
 function isSuperagentBotLogin(login: string | null | undefined): boolean {
-  return login === SUPERAGENT_BOT_LOGIN;
+  return !!login && SUPERAGENT_BOT_LOGINS.has(login);
 }
 
 export async function getReviewComment(
