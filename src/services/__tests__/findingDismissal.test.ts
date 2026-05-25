@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CHECK_NAMES, LABEL_DEFS, MARKERS } from "../../lib/types.js";
 
 const dismissedFindingIds = vi.hoisted(() => new Set<number>());
+const dismissPrFindingMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../prFindingDismissals.js", () => ({
-  dismissPrFinding: ({ reviewCommentId }: { reviewCommentId: number }) => {
+  dismissPrFinding: (params: { reviewCommentId: number }) => {
+    dismissPrFindingMock(params);
+    const { reviewCommentId } = params;
     dismissedFindingIds.add(reviewCommentId);
   },
   isPrFindingDismissed: (
@@ -47,6 +50,7 @@ import { isTrustedRepoContributor } from "../trustedContributor.js";
 import {
   handleFindingThreadResolved,
   handleFindingReply,
+  persistReviewedFindingDismissals,
   reconcilePrScanAfterDismissals,
 } from "../findingDismissal.js";
 
@@ -69,6 +73,8 @@ describe("handleFindingReply", () => {
           body: `${MARKERS.PR_FINDING}\n**P2:** Sandbox scopes`,
           path: "pkg.ts",
           line: 1,
+          commit_id: "finding-sha",
+          user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ],
     });
@@ -109,6 +115,12 @@ describe("handleFindingReply", () => {
     expect(octokit.rest.issues.setLabels).toHaveBeenCalledWith(
       expect.objectContaining({
         labels: expect.arrayContaining([LABEL_DEFS.PR_VERIFIED.name]),
+      }),
+    );
+    expect(dismissPrFindingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewCommentId: 10,
+        headSha: "finding-sha",
       }),
     );
   });
@@ -200,7 +212,13 @@ describe("handleFindingThreadResolved", () => {
     vi.mocked(isTrustedRepoContributor).mockResolvedValueOnce(true);
     const octokit = mockOctokit({
       findingComments: [
-        { id: 10, body: `${MARKERS.PR_FINDING}\n**P2:** one`, path: "a.ts", line: 1 },
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P2:** one`,
+          path: "a.ts",
+          line: 1,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
       ],
     });
 
@@ -249,8 +267,20 @@ describe("reconcilePrScanAfterDismissals", () => {
 
     const octokit = mockOctokit({
       findingComments: [
-        { id: 10, body: `${MARKERS.PR_FINDING}\n**P2:** one`, path: "a.ts", line: 1 },
-        { id: 20, body: `${MARKERS.PR_FINDING}\n**P1:** two`, path: "b.ts", line: 2 },
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P2:** one`,
+          path: "a.ts",
+          line: 1,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
+        {
+          id: 20,
+          body: `${MARKERS.PR_FINDING}\n**P1:** two`,
+          path: "b.ts",
+          line: 2,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
       ],
     });
 
@@ -265,13 +295,57 @@ describe("reconcilePrScanAfterDismissals", () => {
   });
 });
 
+describe("persistReviewedFindingDismissals", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dismissedFindingIds.clear();
+  });
+
+  it("records reviewed findings against the review comment commit SHA", async () => {
+    const octokit = mockOctokit({
+      findingComments: [
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P2:** one`,
+          path: "a.ts",
+          line: 1,
+          commit_id: "comment-sha",
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
+        {
+          id: 11,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 10,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
+      ],
+    });
+
+    await persistReviewedFindingDismissals(octokit, {
+      owner: "acme",
+      repo: "repo",
+      prNumber: 12,
+      headSha: "current-sha",
+    });
+
+    expect(dismissPrFindingMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewCommentId: 10,
+        headSha: "comment-sha",
+      }),
+    );
+  });
+});
+
 function mockOctokit(options?: {
   findingComments?: Array<{
     id: number;
     body: string;
-    path: string;
-    line: number;
+    path?: string;
+    line?: number;
+    commit_id?: string;
     in_reply_to_id?: number;
+    user?: { login?: string; type?: string };
   }>;
 }) {
   const findingComments = options?.findingComments ?? [
@@ -280,6 +354,7 @@ function mockOctokit(options?: {
       body: `${MARKERS.PR_FINDING}\n**P2:** Sandbox scopes`,
       path: "pkg.ts",
       line: 1,
+      user: { login: "superagent-security[bot]", type: "Bot" },
     },
   ];
   const commentById = new Map(

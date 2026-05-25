@@ -1,3 +1,5 @@
+export const SUPERAGENT_URL = "https://superagent.sh";
+
 export const CHECK_NAMES = {
   PR_SCAN: "Security scan",
   CONTRIBUTOR_TRUST: "Contributor trust",
@@ -64,7 +66,6 @@ export interface ContributorResult {
   verdict?: string;
   confidence?: string;
   name?: string;
-  url?: string;
   threats?: Array<{ type: string; detail: string; severity: string }>;
   sub_scores?: {
     identity?: number;

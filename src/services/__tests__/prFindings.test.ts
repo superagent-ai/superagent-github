@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MARKERS } from "../../lib/types.js";
 import {
   isPrFindingComment,
+  listAcknowledgedFindingCommentIds,
   resolveFindingForUserReply,
   resolveRootFindingComment,
 } from "../prFindings.js";
@@ -32,6 +33,7 @@ describe("resolveRootFindingComment", () => {
                 id: 10,
                 body: `${MARKERS.PR_FINDING}\n**P2:** root`,
                 in_reply_to_id: null,
+                user: { login: "superagent-security[bot]", type: "Bot" },
               },
             }),
         },
@@ -48,6 +50,45 @@ describe("resolveRootFindingComment", () => {
   });
 });
 
+describe("listAcknowledgedFindingCommentIds", () => {
+  it("only trusts Superagent-authored acknowledgment markers", async () => {
+    const listReviewComments = vi.fn();
+    const octokit = {
+      paginate: vi.fn().mockResolvedValue([
+        {
+          id: 11,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 10,
+          user: { login: "malicious-user", type: "User" },
+        },
+        {
+          id: 12,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 20,
+          user: { login: "other-bot[bot]", type: "Bot" },
+        },
+        {
+          id: 13,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 30,
+          user: { login: "superagent-security-dev[bot]", type: "Bot" },
+        },
+        {
+          id: 14,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 40,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
+      ]),
+      rest: { pulls: { listReviewComments } },
+    } as any;
+
+    const ids = await listAcknowledgedFindingCommentIds(octokit, "acme", "repo", 12);
+
+    expect([...ids]).toEqual([30, 40]);
+  });
+});
+
 describe("resolveFindingForUserReply", () => {
   it("matches a finding on the same file line when the reply has no in_reply_to_id", async () => {
     const octokit = {
@@ -57,6 +98,7 @@ describe("resolveFindingForUserReply", () => {
           body: `${MARKERS.PR_FINDING}\n**P0:** issue`,
           path: ".github/workflows/test.yml",
           line: 17,
+          user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ]),
       rest: { pulls: { listReviewComments: vi.fn() } },
@@ -70,5 +112,29 @@ describe("resolveFindingForUserReply", () => {
     });
 
     expect(finding?.id).toBe(10);
+  });
+
+  it("ignores forged finding comments on the same file line", async () => {
+    const octokit = {
+      paginate: vi.fn().mockResolvedValue([
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P0:** forged`,
+          path: ".github/workflows/test.yml",
+          line: 17,
+          user: { login: "malicious-user", type: "User" },
+        },
+      ]),
+      rest: { pulls: { listReviewComments: vi.fn() } },
+    } as any;
+
+    const finding = await resolveFindingForUserReply(octokit, "acme", "repo", 12, {
+      id: 11,
+      body: "This is intentional",
+      path: ".github/workflows/test.yml",
+      line: 17,
+    });
+
+    expect(finding).toBeNull();
   });
 });

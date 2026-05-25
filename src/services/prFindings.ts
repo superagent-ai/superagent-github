@@ -1,10 +1,19 @@
 import type { Octokit } from "octokit";
+import { createHash } from "node:crypto";
 import { MARKERS } from "../lib/types.js";
+
+const SUPERAGENT_BOT_LOGINS = new Set([
+  "superagent-security",
+  "superagent-security[bot]",
+  "superagent-security-dev",
+  "superagent-security-dev[bot]",
+]);
 
 export interface PrReviewComment {
   id: number;
   body: string | null;
   in_reply_to_id?: number | null;
+  commit_id?: string | null;
   path?: string;
   line?: number | null;
   user?: { login?: string; type?: string } | null;
@@ -13,6 +22,39 @@ export interface PrReviewComment {
 
 export function isPrFindingComment(body: string | null | undefined): boolean {
   return !!body?.includes(MARKERS.PR_FINDING) && !body.includes(MARKERS.PR_FINDING_ACK);
+}
+
+function isSuperagentFindingComment(comment: {
+  body: string | null;
+  user?: PrReviewComment["user"];
+}): boolean {
+  return isPrFindingComment(comment.body) && isSuperagentBot(comment.user);
+}
+
+const FINGERPRINT_MARKER_RE =
+  /<!--\s*superagent-finding-fingerprint:([a-f0-9]+)\s*-->/i;
+
+export function fingerprintPrFindingCommentBody(
+  body: string | null | undefined,
+): string | undefined {
+  if (!body) return undefined;
+
+  const existing = body.match(FINGERPRINT_MARKER_RE)?.[1];
+  if (existing) return existing;
+
+  const normalized = body
+    .replace(FINGERPRINT_MARKER_RE, "")
+    .replace(MARKERS.PR_FINDING, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return undefined;
+
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+export function appendPrFindingFingerprint(body: string, fingerprint: string): string {
+  return `${body}\n\n<!-- superagent-finding-fingerprint:${fingerprint} -->`;
 }
 
 export async function listPrFindingComments(
@@ -29,8 +71,39 @@ export async function listPrFindingComments(
   });
 
   return comments.filter(
-    (comment) => isPrFindingComment(comment.body) && comment.path && comment.line,
+    (comment) => isSuperagentFindingComment(comment) && comment.path && comment.line,
   );
+}
+
+export async function listAcknowledgedFindingCommentIds(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<Set<number>> {
+  const comments = await octokit.paginate(octokit.rest.pulls.listReviewComments, {
+    owner,
+    repo,
+    pull_number: prNumber,
+    per_page: 100,
+  });
+
+  const ids = new Set<number>();
+  for (const comment of comments) {
+    if (!comment.body?.includes(MARKERS.PR_FINDING_ACK)) continue;
+    if (!isSuperagentBot(comment.user)) continue;
+    if (comment.in_reply_to_id != null) ids.add(comment.in_reply_to_id);
+  }
+
+  return ids;
+}
+
+function isSuperagentBot(user: PrReviewComment["user"]): boolean {
+  return isSuperagentBotLogin(user?.login) && user?.type === "Bot";
+}
+
+function isSuperagentBotLogin(login: string | null | undefined): boolean {
+  return !!login && SUPERAGENT_BOT_LOGINS.has(login);
 }
 
 export async function getReviewComment(
@@ -56,7 +129,7 @@ export async function resolveRootFindingComment(
   let current = comment;
 
   for (let depth = 0; depth < 20; depth++) {
-    if (isPrFindingComment(current.body)) return current;
+    if (isSuperagentFindingComment(current)) return current;
     if (!current.in_reply_to_id) break;
     current = await getReviewComment(octokit, owner, repo, current.in_reply_to_id);
   }
@@ -153,6 +226,7 @@ export async function listResolvedFindingCommentIds(
               nodes: Array<{
                 databaseId: number | null;
                 body: string;
+                author?: { login?: string | null } | null;
               }>;
             };
           }>;
@@ -170,6 +244,9 @@ export async function listResolvedFindingCommentIds(
                 nodes {
                   databaseId
                   body
+                  author {
+                    login
+                  }
                 }
               }
             }
@@ -186,7 +263,7 @@ export async function listResolvedFindingCommentIds(
   for (const thread of threads) {
     if (!thread.isResolved) continue;
     const finding = thread.comments.nodes.find((comment) =>
-      isPrFindingComment(comment.body),
+      isPrFindingComment(comment.body) && isSuperagentBotLogin(comment.author?.login),
     );
     if (finding?.databaseId != null) ids.add(finding.databaseId);
   }
@@ -221,6 +298,7 @@ export async function resolveFindingForReviewThread(
             body: string;
             path?: string | null;
             line?: number | null;
+            author?: { login?: string | null } | null;
           }>;
         };
       } | null;
@@ -234,6 +312,9 @@ export async function resolveFindingForReviewThread(
                 body
                 path
                 line
+                author {
+                  login
+                }
               }
             }
           }
@@ -243,7 +324,7 @@ export async function resolveFindingForReviewThread(
     );
 
     const finding = result.node?.comments?.nodes.find((comment) =>
-      isPrFindingComment(comment.body),
+      isPrFindingComment(comment.body) && isSuperagentBotLogin(comment.author?.login),
     );
     if (finding?.databaseId != null) {
       return {

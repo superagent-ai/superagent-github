@@ -1,4 +1,5 @@
 import type { Octokit } from "octokit";
+import { SUPERAGENT_URL } from "../lib/types.js";
 
 export interface CheckOutput {
   title: string;
@@ -31,6 +32,7 @@ export async function createInProgressCheck(
     head_sha: headSha,
     status: "in_progress",
     started_at: new Date().toISOString(),
+    details_url: SUPERAGENT_URL,
   });
   return data.id;
 }
@@ -50,6 +52,7 @@ export async function completeCheck(
     status: "completed",
     conclusion,
     completed_at: new Date().toISOString(),
+    details_url: SUPERAGENT_URL,
     output,
   });
 }

@@ -7,10 +7,20 @@ import { createInProgressCheck, completeCheck } from "./checkRuns.js";
 import { deleteMarkerComment } from "./comments.js";
 import { getGitHubToken } from "./githubToken.js";
 import { scanPrLocally } from "./prScanner.js";
-import { clearPrFindingDismissals } from "./prFindingDismissals.js";
-import { scheduleDismissalReconcile } from "./findingDismissal.js";
+import {
+  clearPrFindingDismissals,
+  isPrFindingFingerprintDismissed,
+} from "./prFindingDismissals.js";
+import {
+  persistReviewedFindingDismissals,
+  scheduleDismissalReconcile,
+} from "./findingDismissal.js";
 import { clearLabels, ensureLabels, setLabel } from "./labels.js";
 import { childLogger } from "../lib/logger.js";
+import {
+  appendPrFindingFingerprint,
+  fingerprintPrFindingCommentBody,
+} from "./prFindings.js";
 
 const PR_LABELS = [LABEL_DEFS.PR_VERIFIED, LABEL_DEFS.PR_FLAGGED];
 const PR_LABEL_NAMES = PR_LABELS.map((l) => l.name);
@@ -55,10 +65,26 @@ export async function runPrScan(
 
   switch (status) {
     case "review": {
+      await persistReviewedFindingDismissals(octokit, { owner, repo, prNumber, headSha });
+      const findings = result.findings ?? [];
+      const openFindings = findings.filter(
+        (finding) => !isFindingDismissed(owner, repo, prNumber, headSha, finding),
+      );
+
+      if (!openFindings.length) {
+        await completeCheck(octokit, owner, repo, checkRunId, "success", {
+          title: "PR scan passed",
+          summary: "All detected findings were previously reviewed and dismissed.",
+        });
+        await setLabel(octokit, owner, repo, prNumber, LABEL_DEFS.PR_VERIFIED.name, PR_LABEL_NAMES);
+        await deleteMarkerComment(octokit, owner, repo, prNumber, MARKERS.PR_SCAN);
+        break;
+      }
+
       await completeCheck(octokit, owner, repo, checkRunId, "action_required", {
         title: "PR requires security review",
-        summary: `${result.findings?.length ?? 0} security concern(s) detected.`,
-        text: renderFindingsSummary(result.findings ?? []),
+        summary: `${openFindings.length} security concern(s) detected.`,
+        text: renderFindingsSummary(openFindings),
       });
       await setLabel(octokit, owner, repo, prNumber, LABEL_DEFS.PR_FLAGGED.name, PR_LABEL_NAMES);
       await deleteMarkerComment(octokit, owner, repo, prNumber, MARKERS.PR_SCAN);
@@ -68,7 +94,7 @@ export async function runPrScan(
         repo,
         prNumber,
         headSha,
-        result.findings ?? [],
+        openFindings,
       );
       scheduleDismissalReconcile(octokit, { owner, repo, prNumber, headSha });
       break;
@@ -82,6 +108,7 @@ export async function runPrScan(
       await setLabel(octokit, owner, repo, prNumber, LABEL_DEFS.PR_VERIFIED.name, PR_LABEL_NAMES);
       await deleteMarkerComment(octokit, owner, repo, prNumber, MARKERS.PR_SCAN);
       await deleteInlineFindingComments(octokit, owner, repo, prNumber);
+      clearPrFindingDismissals(owner, repo, prNumber);
       break;
     }
 
@@ -96,6 +123,21 @@ export async function runPrScan(
       break;
     }
   }
+}
+
+function isFindingDismissed(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  headSha: string,
+  finding: PrFinding,
+): boolean {
+  const fingerprint = fingerprintPrFinding(finding);
+  return isPrFindingFingerprintDismissed(owner, repo, prNumber, fingerprint, headSha);
+}
+
+function fingerprintPrFinding(finding: PrFinding): string {
+  return fingerprintPrFindingCommentBody(renderInlineFindingCommentBody(finding))!;
 }
 
 function renderFindingsSummary(findings: PrFinding[]): string {
@@ -117,7 +159,6 @@ async function replaceInlineFindingComments(
   headSha: string,
   findings: PrFinding[],
 ): Promise<void> {
-  clearPrFindingDismissals(owner, repo, prNumber);
   await deleteInlineFindingComments(octokit, owner, repo, prNumber);
 
   const comments = findings
@@ -167,6 +208,11 @@ async function deleteInlineFindingComments(
 }
 
 function renderInlineFindingComment(finding: PrFinding): string {
+  const body = renderInlineFindingCommentBody(finding);
+  return appendPrFindingFingerprint(body, fingerprintPrFindingCommentBody(body)!);
+}
+
+function renderInlineFindingCommentBody(finding: PrFinding): string {
   const evidence = compactSentence(finding.short_evidence ?? finding.evidence, 180);
   const recommendation = compactSentence(
     finding.short_recommendation ?? finding.recommendation,
