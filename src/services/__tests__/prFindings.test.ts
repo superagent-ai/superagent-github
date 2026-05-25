@@ -50,7 +50,7 @@ describe("resolveRootFindingComment", () => {
 });
 
 describe("listAcknowledgedFindingCommentIds", () => {
-  it("only trusts bot-authored acknowledgment markers", async () => {
+  it("only trusts Superagent-authored acknowledgment markers", async () => {
     const listReviewComments = vi.fn();
     const octokit = {
       paginate: vi.fn().mockResolvedValue([
@@ -64,6 +64,12 @@ describe("listAcknowledgedFindingCommentIds", () => {
           id: 12,
           body: MARKERS.PR_FINDING_ACK,
           in_reply_to_id: 20,
+          user: { login: "other-bot[bot]", type: "Bot" },
+        },
+        {
+          id: 13,
+          body: MARKERS.PR_FINDING_ACK,
+          in_reply_to_id: 30,
           user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ]),
@@ -72,7 +78,7 @@ describe("listAcknowledgedFindingCommentIds", () => {
 
     const ids = await listAcknowledgedFindingCommentIds(octokit, "acme", "repo", 12);
 
-    expect([...ids]).toEqual([20]);
+    expect([...ids]).toEqual([30]);
   });
 });
 

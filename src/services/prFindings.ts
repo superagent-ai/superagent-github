@@ -2,6 +2,8 @@ import type { Octokit } from "octokit";
 import { createHash } from "node:crypto";
 import { MARKERS } from "../lib/types.js";
 
+const SUPERAGENT_BOT_LOGIN = "superagent-security[bot]";
+
 export interface PrReviewComment {
   id: number;
   body: string | null;
@@ -77,15 +79,15 @@ export async function listAcknowledgedFindingCommentIds(
   const ids = new Set<number>();
   for (const comment of comments) {
     if (!comment.body?.includes(MARKERS.PR_FINDING_ACK)) continue;
-    if (!isBotUser(comment.user)) continue;
+    if (!isSuperagentBot(comment.user)) continue;
     if (comment.in_reply_to_id != null) ids.add(comment.in_reply_to_id);
   }
 
   return ids;
 }
 
-function isBotUser(user: PrReviewComment["user"]): boolean {
-  return user?.type === "Bot" || !!user?.login?.endsWith("[bot]");
+function isSuperagentBot(user: PrReviewComment["user"]): boolean {
+  return user?.login === SUPERAGENT_BOT_LOGIN && user.type === "Bot";
 }
 
 export async function getReviewComment(
