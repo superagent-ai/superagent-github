@@ -34,14 +34,12 @@ export function isPrFindingFingerprintDismissed(
   repo: string,
   prNumber: number,
   findingFingerprint: string,
-  headSha: string,
 ): boolean {
   return !!queries.isPrFindingFingerprintDismissed.get({
     owner,
     repo,
     prNumber,
     findingFingerprint,
-    headSha,
   });
 }
 

@@ -160,7 +160,6 @@ Remove the lifecycle hook or replace it with reviewed local setup code.`),
       "repo",
       12,
       expect.any(String),
-      "abc123",
     );
   });
 

@@ -68,7 +68,7 @@ export async function runPrScan(
       await persistReviewedFindingDismissals(octokit, { owner, repo, prNumber, headSha });
       const findings = result.findings ?? [];
       const openFindings = findings.filter(
-        (finding) => !isFindingDismissed(owner, repo, prNumber, headSha, finding),
+        (finding) => !isFindingDismissed(owner, repo, prNumber, finding),
       );
 
       if (!openFindings.length) {
@@ -129,11 +129,10 @@ function isFindingDismissed(
   owner: string,
   repo: string,
   prNumber: number,
-  headSha: string,
   finding: PrFinding,
 ): boolean {
   const fingerprint = fingerprintPrFinding(finding);
-  return isPrFindingFingerprintDismissed(owner, repo, prNumber, fingerprint, headSha);
+  return isPrFindingFingerprintDismissed(owner, repo, prNumber, fingerprint);
 }
 
 function fingerprintPrFinding(finding: PrFinding): string {
