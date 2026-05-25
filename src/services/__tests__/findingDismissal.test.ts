@@ -73,6 +73,7 @@ describe("handleFindingReply", () => {
           body: `${MARKERS.PR_FINDING}\n**P2:** Sandbox scopes`,
           path: "pkg.ts",
           line: 1,
+          user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ],
     });
@@ -204,7 +205,13 @@ describe("handleFindingThreadResolved", () => {
     vi.mocked(isTrustedRepoContributor).mockResolvedValueOnce(true);
     const octokit = mockOctokit({
       findingComments: [
-        { id: 10, body: `${MARKERS.PR_FINDING}\n**P2:** one`, path: "a.ts", line: 1 },
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P2:** one`,
+          path: "a.ts",
+          line: 1,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
       ],
     });
 
@@ -253,8 +260,20 @@ describe("reconcilePrScanAfterDismissals", () => {
 
     const octokit = mockOctokit({
       findingComments: [
-        { id: 10, body: `${MARKERS.PR_FINDING}\n**P2:** one`, path: "a.ts", line: 1 },
-        { id: 20, body: `${MARKERS.PR_FINDING}\n**P1:** two`, path: "b.ts", line: 2 },
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P2:** one`,
+          path: "a.ts",
+          line: 1,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
+        {
+          id: 20,
+          body: `${MARKERS.PR_FINDING}\n**P1:** two`,
+          path: "b.ts",
+          line: 2,
+          user: { login: "superagent-security[bot]", type: "Bot" },
+        },
       ],
     });
 
@@ -284,6 +303,7 @@ describe("persistReviewedFindingDismissals", () => {
           path: "a.ts",
           line: 1,
           commit_id: "comment-sha",
+          user: { login: "superagent-security[bot]", type: "Bot" },
         },
         {
           id: 11,
@@ -327,6 +347,7 @@ function mockOctokit(options?: {
       body: `${MARKERS.PR_FINDING}\n**P2:** Sandbox scopes`,
       path: "pkg.ts",
       line: 1,
+      user: { login: "superagent-security[bot]", type: "Bot" },
     },
   ];
   const commentById = new Map(

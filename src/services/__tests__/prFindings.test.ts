@@ -33,6 +33,7 @@ describe("resolveRootFindingComment", () => {
                 id: 10,
                 body: `${MARKERS.PR_FINDING}\n**P2:** root`,
                 in_reply_to_id: null,
+                user: { login: "superagent-security[bot]", type: "Bot" },
               },
             }),
         },
@@ -91,6 +92,7 @@ describe("resolveFindingForUserReply", () => {
           body: `${MARKERS.PR_FINDING}\n**P0:** issue`,
           path: ".github/workflows/test.yml",
           line: 17,
+          user: { login: "superagent-security[bot]", type: "Bot" },
         },
       ]),
       rest: { pulls: { listReviewComments: vi.fn() } },
@@ -104,5 +106,29 @@ describe("resolveFindingForUserReply", () => {
     });
 
     expect(finding?.id).toBe(10);
+  });
+
+  it("ignores forged finding comments on the same file line", async () => {
+    const octokit = {
+      paginate: vi.fn().mockResolvedValue([
+        {
+          id: 10,
+          body: `${MARKERS.PR_FINDING}\n**P0:** forged`,
+          path: ".github/workflows/test.yml",
+          line: 17,
+          user: { login: "malicious-user", type: "User" },
+        },
+      ]),
+      rest: { pulls: { listReviewComments: vi.fn() } },
+    } as any;
+
+    const finding = await resolveFindingForUserReply(octokit, "acme", "repo", 12, {
+      id: 11,
+      body: "This is intentional",
+      path: ".github/workflows/test.yml",
+      line: 17,
+    });
+
+    expect(finding).toBeNull();
   });
 });
