@@ -17,6 +17,11 @@ vi.mock("../../lib/logger.js", () => ({
   }),
 }));
 
+vi.mock("../findingDismissal.js", () => ({
+  persistReviewedFindingDismissals: vi.fn().mockResolvedValue([]),
+  scheduleDismissalReconcile: vi.fn(),
+}));
+
 describe("runPrScan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,8 +140,13 @@ describe("runPrScan", () => {
       expect.objectContaining({ labels: ["keep", "pr:verified"] }),
     );
     expect(octokit.rest.pulls.createReview).not.toHaveBeenCalled();
-    expect(octokit.rest.pulls.deleteReviewComment).toHaveBeenCalledWith(
-      expect.objectContaining({ comment_id: 100 }),
+    expect(octokit.rest.pulls.deleteReviewComment).not.toHaveBeenCalled();
+    expect(isPrFindingFingerprintDismissedMock).toHaveBeenCalledWith(
+      "acme",
+      "repo",
+      12,
+      expect.any(String),
+      "abc123",
     );
   });
 

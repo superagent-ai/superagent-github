@@ -60,6 +60,28 @@ export async function listPrFindingComments(
   );
 }
 
+export async function listAcknowledgedFindingCommentIds(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<Set<number>> {
+  const comments = await octokit.paginate(octokit.rest.pulls.listReviewComments, {
+    owner,
+    repo,
+    pull_number: prNumber,
+    per_page: 100,
+  });
+
+  const ids = new Set<number>();
+  for (const comment of comments) {
+    if (!comment.body?.includes(MARKERS.PR_FINDING_ACK)) continue;
+    if (comment.in_reply_to_id != null) ids.add(comment.in_reply_to_id);
+  }
+
+  return ids;
+}
+
 export async function getReviewComment(
   octokit: Octokit,
   owner: string,

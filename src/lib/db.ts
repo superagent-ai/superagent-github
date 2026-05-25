@@ -173,6 +173,7 @@ export const queries: Record<string, Statement> = {
       AND repo = @repo
       AND pr_number = @prNumber
       AND finding_fingerprint = @findingFingerprint
+      AND head_sha = @headSha
     LIMIT 1
   `),
 

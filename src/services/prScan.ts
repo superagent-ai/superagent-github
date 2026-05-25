@@ -11,7 +11,10 @@ import {
   clearPrFindingDismissals,
   isPrFindingFingerprintDismissed,
 } from "./prFindingDismissals.js";
-import { scheduleDismissalReconcile } from "./findingDismissal.js";
+import {
+  persistReviewedFindingDismissals,
+  scheduleDismissalReconcile,
+} from "./findingDismissal.js";
 import { clearLabels, ensureLabels, setLabel } from "./labels.js";
 import { childLogger } from "../lib/logger.js";
 import {
@@ -62,9 +65,10 @@ export async function runPrScan(
 
   switch (status) {
     case "review": {
+      await persistReviewedFindingDismissals(octokit, { owner, repo, prNumber, headSha });
       const findings = result.findings ?? [];
       const openFindings = findings.filter(
-        (finding) => !isFindingDismissed(owner, repo, prNumber, finding),
+        (finding) => !isFindingDismissed(owner, repo, prNumber, headSha, finding),
       );
 
       if (!openFindings.length) {
@@ -74,7 +78,6 @@ export async function runPrScan(
         });
         await setLabel(octokit, owner, repo, prNumber, LABEL_DEFS.PR_VERIFIED.name, PR_LABEL_NAMES);
         await deleteMarkerComment(octokit, owner, repo, prNumber, MARKERS.PR_SCAN);
-        await deleteInlineFindingComments(octokit, owner, repo, prNumber);
         break;
       }
 
@@ -126,10 +129,11 @@ function isFindingDismissed(
   owner: string,
   repo: string,
   prNumber: number,
+  headSha: string,
   finding: PrFinding,
 ): boolean {
   const fingerprint = fingerprintPrFinding(finding);
-  return isPrFindingFingerprintDismissed(owner, repo, prNumber, fingerprint);
+  return isPrFindingFingerprintDismissed(owner, repo, prNumber, fingerprint, headSha);
 }
 
 function fingerprintPrFinding(finding: PrFinding): string {
