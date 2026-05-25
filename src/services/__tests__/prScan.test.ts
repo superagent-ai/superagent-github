@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CHECK_NAMES, DEFAULT_CONFIG } from "../../lib/types.js";
+import { CHECK_NAMES, DEFAULT_CONFIG, MARKERS } from "../../lib/types.js";
 import { runPrScan } from "../prScan.js";
+import { fingerprintPrFindingCommentBody } from "../prFindings.js";
 
 const isPrFindingFingerprintDismissedMock = vi.hoisted(() => vi.fn());
 
@@ -97,8 +98,21 @@ describe("runPrScan", () => {
     expect(body).toContain("A new postinstall hook executes a remote script.");
     expect(body).toContain("Remove the lifecycle hook");
     expect(body).toContain("**P1:** Suspicious lifecycle hook");
+    expect(body).toContain("<summary>AI prompt</summary>");
+    expect(body).toContain("Check if this security scanner issue is valid.");
+    expect(body).toContain('<file name="package.json">');
+    expect(body).toContain('<violation number="1" location="package.json:1">');
+    expect(body).toContain("<title>Suspicious lifecycle hook</title>");
     expect(body).not.toContain("Fix:");
     expect(body).not.toContain("Recommended fix");
+    expect(fingerprintPrFindingCommentBody(body)).toBe(
+      fingerprintPrFindingCommentBody(`${MARKERS.PR_FINDING}
+**P1:** Suspicious lifecycle hook
+
+A new postinstall hook executes a remote script.
+
+Remove the lifecycle hook or replace it with reviewed local setup code.`),
+    );
   });
 
   it("does not recreate comments for previously dismissed findings", async () => {

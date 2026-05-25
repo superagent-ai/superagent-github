@@ -137,7 +137,7 @@ function isFindingDismissed(
 }
 
 function fingerprintPrFinding(finding: PrFinding): string {
-  return fingerprintPrFindingCommentBody(renderInlineFindingCommentBody(finding))!;
+  return fingerprintPrFindingCommentBody(renderInlineFindingFingerprintBody(finding))!;
 }
 
 function renderFindingsSummary(findings: PrFinding[]): string {
@@ -209,10 +209,16 @@ async function deleteInlineFindingComments(
 
 function renderInlineFindingComment(finding: PrFinding): string {
   const body = renderInlineFindingCommentBody(finding);
-  return appendPrFindingFingerprint(body, fingerprintPrFindingCommentBody(body)!);
+  return appendPrFindingFingerprint(body, fingerprintPrFinding(finding));
 }
 
 function renderInlineFindingCommentBody(finding: PrFinding): string {
+  return `${renderInlineFindingFingerprintBody(finding)}
+
+${renderAiPrompt(finding)}`;
+}
+
+function renderInlineFindingFingerprintBody(finding: PrFinding): string {
   const evidence = compactSentence(finding.short_evidence ?? finding.evidence, 180);
   const recommendation = compactSentence(
     finding.short_recommendation ?? finding.recommendation,
@@ -225,6 +231,59 @@ function renderInlineFindingCommentBody(finding: PrFinding): string {
 ${evidence}
 
 ${recommendation}`;
+}
+
+function renderAiPrompt(finding: PrFinding): string {
+  return `<details>
+<summary>AI prompt</summary>
+
+${markdownCodeFence(renderAiPromptText(finding))}
+
+</details>`;
+}
+
+function renderAiPromptText(finding: PrFinding): string {
+  const file = finding.file ?? "unknown";
+  const location = finding.file
+    ? `${finding.file}${finding.line ? `:${finding.line}` : ""}`
+    : finding.line
+      ? `line ${finding.line}`
+      : "unknown";
+
+  return `Check if this security scanner issue is valid. If so, understand the root cause and fix it. If appropriate, update or add tests. Keep the change focused and preserve intended behavior.
+
+<file name="${escapeXmlAttribute(file)}">
+<violation number="1" location="${escapeXmlAttribute(location)}">
+<priority>${escapeXmlText(formatFindingPriority(finding.severity))}</priority>
+<title>${escapeXmlText(finding.title)}</title>
+<evidence>${escapeXmlText(finding.evidence)}</evidence>
+<recommendation>${escapeXmlText(finding.recommendation)}</recommendation>
+</violation>
+</file>`;
+}
+
+function markdownCodeFence(value: string): string {
+  const fenceLength = Math.max(
+    3,
+    ...Array.from(value.matchAll(/`+/g), (match) => match[0].length + 1),
+  );
+  const fence = "`".repeat(fenceLength);
+  return `${fence}text
+${value}
+${fence}`;
+}
+
+function escapeXmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function escapeXmlAttribute(value: string): string {
+  return escapeXmlText(value)
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function compactSentence(value: string, maxLength: number): string {
